@@ -519,19 +519,27 @@ function json(res, code, obj, extraHeaders) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...(extraHeaders || {}) });
   res.end(body);
 }
+// Every way of failing to read a body is the caller's problem, not a server error, so each
+// rejection carries the status the dispatcher should answer with — `httpStatus: 0` meaning there
+// is nobody left to answer. Without it a malformed body (unauthenticated on /api/login/verify)
+// printed a stack trace and a 500, and a browser hanging up mid-body — routine on pagehide —
+// printed one more.
+const bodyError = (msg, httpStatus) => Object.assign(new Error(msg), { httpStatus });
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
     req.on('data', d => {
       size += d.length;
-      if (size > MAX_BODY) { reject(new Error('body too large')); req.destroy(); return; }
+      // Paused, not destroyed: destroying the socket leaves the client with no status at all.
+      // The rest of the body is never read, so the answer carries Connection: close.
+      if (size > MAX_BODY) { req.pause(); reject(bodyError('body too large', 413)); return; }
       chunks.push(d);
     });
     req.on('end', () => {
       try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); }
-      catch { reject(new Error('bad json')); }
+      catch { reject(bodyError('bad json', 400)); }
     });
-    req.on('error', reject);
+    req.on('error', e => reject(Object.assign(e, { httpStatus: 0 })));
   });
 }
 const b64uToBuf = s => Buffer.from(s, 'base64url');
@@ -1175,6 +1183,17 @@ http.createServer(async (req, res) => {
   }
   try { await handler(req, res); }
   catch (e) {
+    // A body that could not be read is the caller's problem and carries its own status
+    // (see readBody). Only a genuine server error is worth a stack trace in the log.
+    if (e?.httpStatus === 0) { console.warn(key, 'client went away mid-body:', e.message); return; }
+    if (e?.httpStatus) {
+      // 413 alone leaves an unread body behind — readBody pauses the request rather than draining
+      // it — so that socket cannot frame another request and the answer closes it. A 400 has read
+      // the whole body and its connection is still good, so it is left keep-alive as before.
+      const extra = e.httpStatus === 413 ? { Connection: 'close' } : undefined;
+      if (!res.headersSent) json(res, e.httpStatus, { error: e.message }, extra);
+      return;
+    }
     console.error(key, e);
     if (!res.headersSent) json(res, 500, { error: 'server error' });
   }
