@@ -874,7 +874,10 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     const body = await readBody(req);
-    if (!body.state || typeof body.state !== 'object') return json(res, 400, { error: 'state required' });
+    // An array passes `typeof === 'object'`: JSON.stringify then drops the `_rev` set on it, the
+    // file on disk becomes literally `[]`, the revision counter restarts at 0 and every
+    // conditional write after that compares against the wrong number. No shipped client sends one.
+    if (!body.state || typeof body.state !== 'object' || Array.isArray(body.state)) return json(res, 400, { error: 'state required' });
     // The reminder tick and the admin routes iterate these two on the server's side, so a truthy
     // non-array would throw there on every pass for as long as it sat on disk. Absent or null is
     // fine — every client fills its own defaults.

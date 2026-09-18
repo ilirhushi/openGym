@@ -110,3 +110,27 @@ test('GET/PUT /api/data: revisions, conditional writes and the legacy overwrite'
   assert.equal(r.body.error, 'invalid state');
   assert.equal(onDisk()._rev, 4);
 });
+
+// An array is a `typeof 'object'` that cannot carry `_rev`: JSON.stringify drops the property,
+// the document on disk becomes literally `[]`, the revision counter restarts at 0 and every
+// conditional write from then on compares against a number that means nothing. The profile is
+// gone with it. No shipped client sends an array — this needs curl.
+test('PUT /api/data refuses an array outright, revision and profile intact', async t => {
+  const h = await startServer(t);
+  const uid = 'u_rev_1';
+  const put = async body => { const r = await fetch(`${h.api}/api/data`, { method: 'PUT', headers: headers(uid), body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
+  const rev = async () => (await fetch(`${h.api}/api/data/rev`, { headers: headers(uid) }).then(r => r.json())).rev;
+  const onDisk = () => fs.readFileSync(path.join(h.dataDir, `state-${uid}.json`), 'utf8');
+
+  let r = await put({ state: { _ts: 100, workouts: [{ id: 'w1', d: '2026-09-01' }], routines: [] } });
+  assert.equal(r.status, 200);
+  assert.equal(await rev(), 1);
+
+  for (const state of [[], [{ id: 'w1' }]]) {
+    r = await put({ state });
+    assert.equal(r.status, 400, `state: ${JSON.stringify(state)}`);
+    assert.equal(r.body.error, 'state required');
+  }
+  assert.equal(await rev(), 1, 'the revision counter never restarted');
+  assert.deepEqual(JSON.parse(onDisk()).workouts.map(w => w.id), ['w1'], 'the profile is still there');
+});
