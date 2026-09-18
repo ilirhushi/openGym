@@ -108,7 +108,12 @@ function Shell() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
   useLayoutEffect(() => {
+    const prev = pathRef.current
     pathRef.current = loc.pathname
+    // A POP that lands on the same screen is a sheet's history entry going away (Modals pushes one
+    // per sheet so the system back button closes it) — the page has not moved, and asking for the
+    // recorded position a frame later only adds a scroll to the sheet's own restore.
+    if (navType === 'POP' && prev === loc.pathname) return
     if (navType !== 'POP') { window.scrollTo(0, 0); return }
     const y = scrollPositions.get(loc.pathname) || 0
     // the restored view needs a layout pass before it is tall enough to scroll to y
