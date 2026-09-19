@@ -79,6 +79,10 @@ export const DEF = {
   // the session straight away; weight can still be logged from Home/Stats. Defaults on; an
   // older profile without the key reads as on (`!== false`).
   weighIn: true,
+  // Per-language choice for translated exercise names: whether the original English name is
+  // shown in parentheses next to the translation. Map { '<lang>': boolean }; a missing key
+  // (any profile written before this setting existed) reads as shown.
+  enParens: {},
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 

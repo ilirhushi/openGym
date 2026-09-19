@@ -314,6 +314,8 @@ export default {
   'synced with your profile': 'ซิงค์กับโปรไฟล์ของคุณ',
   'Language': 'ภาษา',
   "Exercise instructions aren't available in this language yet — they stay in English.": 'คำแนะนำท่าออกกำลังกายยังไม่มีในภาษานี้ — จะแสดงเป็นภาษาอังกฤษ',
+  'English exercise names': 'ชื่อท่าออกกำลังกายเป็นภาษาอังกฤษ',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': 'แสดงชื่อภาษาอังกฤษในวงเล็บถัดจากชื่อที่แปลแล้ว แต่ละภาษาจะจำตัวเลือกของตัวเอง',
   'Theme': 'ธีม',
   'Dark': 'มืด',
   'Light': 'สว่าง',

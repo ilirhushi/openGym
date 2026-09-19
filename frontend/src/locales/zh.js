@@ -307,6 +307,8 @@ export default {
   'synced with your profile': '与档案同步',
   'Language': '语言',
   "Exercise instructions aren't available in this language yet — they stay in English.": '动作说明暂无此语言版本——保持英文。',
+  'English exercise names': '英文动作名称',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': '在译文旁以括号显示英文名称。每种语言记住各自的选择。',
   'Theme': '主题',
   'Dark': '深色',
   'Light': '浅色',

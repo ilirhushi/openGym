@@ -314,6 +314,8 @@ export default {
   'synced with your profile': 'szinkronizálva a profiloddal',
   'Language': 'Nyelv',
   'Exercise instructions aren\'t available in this language yet — they stay in English.': 'A gyakorlatleírások ezen a nyelven még nem érhetők el — angolul maradnak.',
+  'English exercise names': 'Angol gyakorlatnevek',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': 'Az angol nevet zárójelben, a lefordított mellett mutatja. Minden nyelv megjegyzi a saját választását.',
   'Theme': 'Téma',
   'Dark': 'Sötét',
   'Light': 'Világos',
