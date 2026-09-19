@@ -890,7 +890,16 @@ const routes = {
     // An array passes `typeof === 'object'`: JSON.stringify then drops the `_rev` set on it, the
     // file on disk becomes literally `[]`, the revision counter restarts at 0 and every
     // conditional write after that compares against the wrong number. No shipped client sends one.
-    if (!body.state || typeof body.state !== 'object' || Array.isArray(body.state)) return json(res, 400, { error: 'state required' });
+    //
+    // An object with nothing of the profile in it is the same loss with the counter left intact:
+    // the document on disk becomes `{"_rev":n+1}`, every routine, workout and weigh-in gone, and
+    // the next poll reports a revision the client accepts. `_rev` and `_ts` do not count towards
+    // that — both are bookkeeping this route writes or echoes itself, so `{}` and `{"_rev":5}`
+    // are the same push and get the same refusal. Nothing shipped sends either: the web and
+    // mobile clients push a state built on DEF (frontend/src/store/useStore.js), which always
+    // carries its keys.
+    if (!body.state || typeof body.state !== 'object' || Array.isArray(body.state)
+      || !Object.keys(body.state).some(k => k !== '_rev' && k !== '_ts')) return json(res, 400, { error: 'state required' });
     // The reminder tick and the admin routes iterate these two on the server's side, so a truthy
     // non-array would throw there on every pass for as long as it sat on disk. Absent or null is
     // fine — every client fills its own defaults.

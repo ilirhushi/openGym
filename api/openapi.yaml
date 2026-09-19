@@ -556,7 +556,8 @@ paths:
                       - type: 'null'
         '400':
           description: >-
-            `state` missing or not an object, or `workouts`/`routines` set to anything
+            `state` missing, not an object, an array, or an object with no keys at all
+            (both would empty the profile), or `workouts`/`routines` set to anything
             other than an array or null.
           content:
             application/json:
