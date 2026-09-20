@@ -4,7 +4,7 @@ import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { bindUI } from './components/ui.jsx'
 import { ACCENTS } from './lib/format.js'
-import { setLang, useLang } from './lib/i18n.js'
+import { setLang, useLang, baseLang } from './lib/i18n.js'
 import { setPlayOnSilent } from './lib/sound.js'
 import { setNav } from './lib/nav.js'
 import { initBackButton } from './lib/back.js'
@@ -80,7 +80,7 @@ function Shell() {
     mql.addEventListener('change', onChange)
     return () => mql.removeEventListener('change', onChange)
   }, [S.theme, S.accent])
-  useEffect(() => { setLang(S.lang || 'en') }, [S.lang])
+  useEffect(() => { setLang(S.lang || 'en', S.enParens?.[baseLang(S.lang || 'en')] ?? true) }, [S.lang, S.enParens])
   useEffect(() => { document.documentElement.lang = S.lang || 'en' }, [langV, S.lang])
   // Forward navigation starts at the top; going back lands where you left off.
   // The position is recorded from scroll events rather than read at route

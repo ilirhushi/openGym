@@ -21,6 +21,8 @@ export const PT_BR_OVERRIDES = {
   'Save': 'Salvar',
   'Log': 'Registrar',
   'Settings': 'Configurações',
+  'English exercise names': 'Nomes de exercícios em inglês',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': 'Mostra o nome em inglês entre parênteses ao lado do traduzido. Cada idioma lembra a própria escolha.',
   'Log body weight': 'Registrar peso corporal',
   'Slide or tap to set your weight — tracked before every workout so your curve stays honest.': 'Deslize ou toque para informar seu peso — ele é registrado antes de cada treino para manter a curva precisa.',
   'Save & start workout': 'Salvar e iniciar treino',
