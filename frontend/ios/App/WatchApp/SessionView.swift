@@ -167,7 +167,7 @@ struct SessionView: View {
                 .digitalCrownRotation(
                     secBinding(entryIndex: i, setIndex: j),
                     from: 0, through: 600, by: Self.secondsStep,
-                    sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+                    sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
         } else if set.min != nil {
             // Cardio entries are read-only here too, same as the file this replaces: there's no
             // crown-adjustable field for them, just the logged duration and pace. The duration
@@ -188,8 +188,8 @@ struct SessionView: View {
                     .focused($crownFocus, equals: .weight)
                     .digitalCrownRotation(
                         weightBinding(entryIndex: i, setIndex: j),
-                        from: 0, through: 500, by: Self.weightStep,
-                        sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+                        from: 0, through: 500, by: weightStep,
+                        sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
                     .onTapGesture { crownFocus = .weight }
                 // No "reps" word: the multiplication sign already says what this number counts,
                 // and the two characters it costs are two characters of numeral size.
@@ -203,7 +203,7 @@ struct SessionView: View {
                     .digitalCrownRotation(
                         repsBinding(entryIndex: i, setIndex: j),
                         from: 0, through: 50, by: Self.repsStep,
-                        sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+                        sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
                     .onTapGesture { crownFocus = .reps }
             }
         }
@@ -281,7 +281,16 @@ struct SessionView: View {
     // crown was writing 60.13 and the card rendered "60.1", a weight nobody loads and nobody can
     // settle the crown on. Every setter below snaps to its own step, so the value written is
     // always one you could actually put on a bar.
-    private static let weightStep = 2.5
+    // Half a kilo, not the 2.5 the Stepper this replaced used and not the 2.5/5 that
+    // progression.js's weightIncrement resolves. Those exist to decide next session's load; the
+    // crown is doing a different job, correcting a weight you are already standing under because
+    // the bar came out at 27.5 rather than 30. A correction wants fine granularity, and the
+    // journey from 20 to 100 is one you essentially never make here, since the card opens on the
+    // prescribed value.
+    //
+    // Pounds take 1.0: half a pound is finer than any plate anyone owns, and units.js is
+    // explicit that an increment is a load and does not carry across units unchanged.
+    private var weightStep: Double { (session.unit ?? "kg") == "lb" ? 1.0 : 0.5 }
     private static let repsStep = 1.0
     private static let secondsStep = 5.0
 
@@ -293,7 +302,7 @@ struct SessionView: View {
         Binding(
             get: { session.entries[i].sets[j].w ?? 0 },
             set: { newValue in
-                let snapped = Self.snap(newValue, to: Self.weightStep)
+                let snapped = Self.snap(newValue, to: weightStep)
                 // Only write on a real change. The crown reports continuously, so without this
                 // every fractional wobble inside one detent would run the whole persist path.
                 guard snapped != session.entries[i].sets[j].w else { return }
