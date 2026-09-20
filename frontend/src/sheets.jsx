@@ -37,6 +37,7 @@ import { isFav, toggleFav, sortFavouritesFirst } from './lib/favourites.js'
 import { buildSessionEntries } from './lib/session-start.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
 import { workoutsOn, backfillStart, backfillEnd, completeBackfill } from './lib/backfill.js'
+import { decideWatchImport } from './lib/watch-bridge.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -1823,7 +1824,7 @@ function LogPastWorkout({ close }) {
 }
 // Three ways out when the day already has a workout. Replacing with several on that day means
 // picking which one; the rest of the day is left alone.
-function SameDayChoice({ iso, existing, onReplace, onAdd, close }) {
+export function SameDayChoice({ iso, existing, onReplace, onAdd, close }) {
   return <div style={{ textAlign: 'center', padding: '4px 0' }}>
     <h3 style={{ marginBottom: 8 }}>{fmtDate(iso, true)}</h3>
     <div className="muted" style={{ marginBottom: 18, lineHeight: 1.5 }}>{t('There is already a workout on that day.')}</div>
@@ -2068,7 +2069,7 @@ function WorkoutComplete({ close }) {
 }
 export const workoutCompleteSheet = () => ui().openSheet(close => <WorkoutComplete close={close} />, { kind: 'center' })
 
-function FinishSummary({ w, prs, e1prs = [], close }) {
+export function FinishSummary({ w, prs, e1prs = [], close }) {
   const st = useStore(s => s.S)
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
@@ -2137,4 +2138,23 @@ function doFinishWorkout() {
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
   ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
+}
+
+/* ============================ Apple Watch session import ============================ */
+// A session logged on the Watch arrives here already finished (design doc §3: the Watch never
+// runs progression). This only decides same-day placement and applies the result, reusing the
+// existing SameDayChoice sheet for the conflict case instead of inventing a new one.
+export function handleIncomingWatchSession(payload) {
+  const st = S()
+  decideWatchImport(st, payload, {
+    apply: ({ workouts, exWeights, w, prs, e1prs }) => {
+      update(s => { s.workouts = workouts; s.exWeights = exWeights })
+      useStore.getState().autoBackupNow()
+      ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
+    },
+    askUser: (existing, choose) => {
+      ui().openSheet(c => <SameDayChoice iso={payload.date} existing={existing} close={c}
+        onReplace={id => { c(); choose(id) }} onAdd={() => { c(); choose(null) }} />, { kind: 'center' })
+    },
+  })
 }
