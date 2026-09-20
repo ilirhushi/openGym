@@ -31,6 +31,11 @@ export const DEF = {
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   // Stats activity heatmap metric. Profiles without this key continue to open on time.
   heatmapMetric: 'time',
+  // Apple Health sync, off until the user turns it on in Settings (iOS mobile build only).
+  // Read at finish time, never captured at workout start, so turning it off mid-session takes
+  // effect immediately. Nothing is sent to any third party and openGym never phones home; the
+  // hr summary rides on the workout record, so it syncs to your own server along with it.
+  health: false,
   // How the active workout is laid out — 'cards' (one exercise at a time with Prev/Next),
   // 'list' (every exercise stacked and scrollable) or 'compact' (that stack stripped to just
   // names and set rows — no media, tags, notes, last-time or progression line). Purely

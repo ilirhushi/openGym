@@ -54,6 +54,16 @@ export function finishWatchSession(st, payload, { replaceId = null } = {}) {
   const w = buildCompletedWorkout(active, { end: payload.end, prs })
   if (!w.entries.length) return null
   w.vol = workoutVolume(w)
+  // What the Watch's HKWorkoutSession measured, when there was one. Written only when there is
+  // at least one figure, matching the convention buildCompletedWorkout already follows for rid,
+  // noProg and note: an ordinary session stays byte-for-byte the shape it always was, and older
+  // profiles read back identically. `saved` is deliberately not stored: it is a fact about the
+  // Health write, consumed at import time, not a property of the workout.
+  const hr = {}
+  if (Number.isFinite(payload.health?.avgHr)) hr.avg = payload.health.avgHr
+  if (Number.isFinite(payload.health?.maxHr)) hr.max = payload.health.maxHr
+  if (Number.isFinite(payload.health?.kcal)) hr.kcal = payload.health.kcal
+  if (Object.keys(hr).length) w.hr = hr
   const kept = replaceId ? st.workouts.filter(x => x.id !== replaceId) : st.workouts
   const workouts = insertChronological(kept, w)
   const exWeights = { ...st.exWeights }

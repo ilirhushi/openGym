@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { EXIDX, matchExercise, isAssisted } from '../lib/exercises.js'
-import { lastBW, lastBF, streakWeeks, setLabel, modeOf, effortOf, entriesForExercise, metricEntriesForExercise, metricModeForEntry, bestWeightForEntry, completedRepsOf, metresToDisplay, distanceUnitLabel, workoutDay } from '../lib/history.js'
+import { lastBW, lastBF, streakWeeks, setLabel, modeOf, effortOf, entriesForExercise, metricModeForEntry, bestWeightForEntry, completedRepsOf, metresToDisplay, distanceUnitLabel, workoutDay } from '../lib/history.js'
 import { fmtNum, fmtDate, fmtVol, todayISO, weekStartOf } from '../lib/format.js'
 import { t, exerciseNameFor, getLang } from '../lib/i18n.js'
 import { bwSheet, goalSheet, bfSheet, bfGoalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor, bfDeltaColor } from '../sheets.jsx'
@@ -15,6 +15,9 @@ import { fatigueOf, strengthOf, STRENGTH_FLOOR, LB_TO_KG } from '../lib/recovery
 import { strengthExerciseRowsForMuscle } from '../lib/strength-exercises.js'
 import { fatigueStateOf } from '../lib/recovery-view.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
+import { weeklyTrend } from '../lib/training-trend.js'
+import { personalRecords, metricDataOf } from '../lib/records.js'
+import { stalledExercises } from '../lib/plateaus.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -302,15 +305,27 @@ export default function Stats() {
   const bw30 = S.bodyweight.filter(b => (b.t || new Date(b.d).getTime()) > now - 30 * 86400000)
   const bwDelta30 = bw30.length > 1 ? bw30[bw30.length - 1].w - bw30[0].w : null
   const workouts = S.workouts
+  const [trendView, setTrendView] = useState('vol')
+  const [trendRange, setTrendRange] = useState(90)
+  const trendWeeks = trendRange === 0 ? 0 : Math.ceil(trendRange / 7)
+  const weekly = useMemo(() => weeklyTrend(workouts, trendWeeks, weekStartOf(S), now),
+    [workouts, trendWeeks, S.weekStart, now])
+  const trendPts = useMemo(() => weekly.map(pt => ({ t: pt.t, y: trendView === 'vol' ? pt.vol : pt.count })), [weekly, trendView])
+  const avgOf = arr => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null)
+  const completedWeeks = weekly.slice(0, -1) // exclude the current, still in-progress week
+  const trendLast4 = completedWeeks.slice(-4).map(pt => (trendView === 'vol' ? pt.vol : pt.count))
+  const trendPrev4 = completedWeeks.slice(-8, -4).map(pt => (trendView === 'vol' ? pt.vol : pt.count))
+  const trendDelta = completedWeeks.length >= 8 ? avgOf(trendLast4) - avgOf(trendPrev4) : null
   const monthW = workouts.filter(w => String(w.d || '').slice(0, 7) === todayISO().slice(0, 7)).length
-
-  const metricDataOf = (workout, id) => {
-    const entries = metricEntriesForExercise(workout, id)
-    const mode = entries.at(-1)?.mode || null
-    const sameMode = entries.filter(item => item.mode === mode)
-    const best = mode === 'reps' ? Math.max(0, ...sameMode.map(item => bestWeightForEntry(item.entry))) : 0
-    return { mode, entries: sameMode, rows: sameMode.flatMap(item => item.rows), best }
+  const recordLabel = r => {
+    if (r.metric === 'weight') return fmtNum(r.value) + ' ' + S.unit
+    if (r.metric === 'e1rm') return t('Est. 1RM') + ' ' + fmtNum(r.value) + ' ' + S.unit
+    if (r.metric === 'reps') return fmtNum(r.value) + ' ' + t('reps')
+    if (r.metric === 'speed') return fmtNum(r.value) + ' km/h'
+    if (r.metric === 'distance') return fmtNum(metresToDisplay(r.value, S.unit)) + ' ' + distanceUnitLabel(S.unit)
+    return fmtNum(r.value) + ' s' // time
   }
+
   const entryOf = id => workouts.flatMap(w => w.entries).find(e => e.id === id)
   const listOf = value => Array.isArray(value) ? value : value == null || value === '' ? [] : [value]
   const firstAvailable = (...values) => {
@@ -367,6 +382,8 @@ export default function Stats() {
   const exCurrent = Object.fromEntries(exHist.map(id => [id, currentOf(id)]))
   exHist.sort((a, b) => exCurrent[b].mx - exCurrent[a].mx || nameOf(a).localeCompare(nameOf(b)))
   const curEx = exId && exHist.includes(exId) ? exId : exHist[0] || null
+  const records = useMemo(() => personalRecords(S).filter(r => exHist.includes(r.id)), [S, exHist])
+  const stalled = useMemo(() => stalledExercises(S).filter(f => exHist.includes(f.id)), [S, exHist])
   // A completed reps work row is authoritative for strength metrics, even when the parent
   // target also contains timed/cardio work. Entries without reps rows use their selected mode.
   const curMode = curEx ? (() => {
@@ -471,6 +488,43 @@ export default function Stats() {
 
     {workouts.length > 0 && <MuscleBalance S={S} />}
     {hasEffort(S) && <EffortCard S={S} />}
+
+    {workouts.length > 0 && <div className="card">
+      <h2>{t('Training Volume')}</h2>
+      <Segmented className="seg-range" value={trendView} onChange={setTrendView}
+        options={[{ value: 'vol', label: t('Volume') }, { value: 'freq', label: t('Frequency') }]} />
+      <Segmented className="seg-range" value={trendRange} onChange={setTrendRange}
+        options={[{ value: 30, label: '1M' }, { value: 90, label: '3M' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
+      {weekly.length >= 2 ? <>
+        <div className="chart"><LineChart points={trendPts} h={150} unit={trendView === 'vol' ? S.unit : t('workouts')} color="var(--blue)" /></div>
+        {trendDelta != null && <div className="small dim" style={{ marginTop: 8 }}>
+          {t('Last 4 weeks vs. the 4 before:')}{' '}
+          <b style={{ color: trendDelta === 0 ? 'inherit' : trendDelta > 0 ? 'var(--acc)' : 'var(--red)' }}>
+            {trendDelta > 0 ? '+' : ''}{trendView === 'vol' ? fmtVol(trendDelta, S.unit) : fmtNum(trendDelta)}
+          </b>
+        </div>}
+      </> : <div className="muted small">{t('Not enough weeks of training yet.')}</div>}
+    </div>}
+
+    <div className="card">
+      <h2>{t('Personal Records')}</h2>
+      {records.length ? <>
+        <div className="list">{records.slice(0, 10).map(r => <div key={r.id + '-' + r.metric} className="row between small" style={{ padding: '6px 0', borderBottom: 'var(--hair) solid var(--sep)' }}>
+          <span>{nameOf(r.id)}</span>
+          <span className="row" style={{ gap: 8 }}><b>{recordLabel(r)}</b><span className="muted">{fmtDate(r.date, true)}</span></span>
+        </div>)}</div>
+        {records.length > 10 && <div className="small dim" style={{ marginTop: 8 }}>{t('+{0} more', records.length - 10)}</div>}
+      </> : <div className="muted small">{t('No personal records yet.')}</div>}
+    </div>
+
+    {stalled.length > 0 && <div className="card">
+      <h2>{t('Needs Attention')}</h2>
+      <div className="list">{stalled.slice(0, 10).map(f => <div key={f.id} className="mrow" style={{ cursor: 'pointer' }} {...tappable(() => setExId(f.id))}>
+        <span className="nm">{nameOf(f.id)}</span>
+        <span className="v dim small">{t(...f.reason)}</span>
+      </div>)}</div>
+      {stalled.length > 10 && <div className="small dim" style={{ marginTop: 8 }}>{t('+{0} more', stalled.length - 10)}</div>}
+    </div>}
 
     <div className="cols">
       <div className="card">
