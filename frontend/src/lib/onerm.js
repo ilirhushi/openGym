@@ -1,5 +1,6 @@
 import { isSideSet } from './workout-model.js'
 import { entriesForExercise, metricRowsForEntry } from './history.js'
+import { isAssisted } from './exercises.js'
 // Estimated one-rep max (issue #18).
 //
 // Deliberately knows nothing about the exercise database: an estimate needs a weight AND a
@@ -43,7 +44,10 @@ export function estimate1RM(w, r, formula = DEFAULT_FORMULA) {
 // Best estimate out of one workout entry's completed sets.
 // `topW` is ignored on purpose: it records the working weight a user confirmed after the
 // exercise, with no rep count attached, so it cannot produce an estimate.
+// For assisted exercises less assistance is harder, so the best set is the one with the
+// smallest assistance weight (and smallest estimate).
 export function bestSetOf(entry, formula = DEFAULT_FORMULA) {
+  const assisted = isAssisted(entry?.target || entry)
   let best = null
   metricRowsForEntry(entry, 'reps').forEach(s => {
     const sets = isSideSet(s)
@@ -51,7 +55,9 @@ export function bestSetOf(entry, formula = DEFAULT_FORMULA) {
       : [s]
     sets.forEach(set => {
       const est = estimate1RM(set.w, set.r, formula)
-      if (est !== null && (!best || est > best.est)) best = { est, w: Number(set.w), r: Math.round(Number(set.r)) }
+      if (est === null) return
+      const better = !best ? true : assisted ? est < best.est : est > best.est
+      if (better) best = { est, w: Number(set.w), r: Math.round(Number(set.r)) }
     })
   })
   return best
@@ -80,8 +86,13 @@ export function e1rmSeries(S, exId, formula = DEFAULT_FORMULA) {
 // All-time best estimate for an exercise, with the set and date it came from — the source
 // matters, because "142.5 kg est. from 100×10" is a very different claim from "from 140×1".
 export function best1RM(S, exId, formula = DEFAULT_FORMULA) {
+  const assisted = isAssisted(exId)
   let best = null
-  e1rmSeries(S, exId, formula).forEach(p => { if (!best || p.y > best.est) best = { est: p.y, w: p.w, r: p.r, d: p.d, t: p.t } })
+  e1rmSeries(S, exId, formula).forEach(p => {
+    if (!best) { best = { est: p.y, w: p.w, r: p.r, d: p.d, t: p.t }; return }
+    const better = assisted ? p.y < best.est : p.y > best.est
+    if (better) best = { est: p.y, w: p.w, r: p.r, d: p.d, t: p.t }
+  })
   return best
 }
 
@@ -91,5 +102,8 @@ export function is1RMRecord(S, exId, entry, formula = DEFAULT_FORMULA) {
   const now = bestSetOf(entry, formula)
   if (!now) return null
   const prev = best1RM(S, exId, formula)
-  return !prev || now.est > prev.est ? { ...now, prev: prev ? prev.est : 0 } : null
+  if (!prev) return { ...now, prev: 0 }
+  const assisted = isAssisted(exId) || isAssisted(entry?.target || entry)
+  const better = assisted ? now.est < prev.est : now.est > prev.est
+  return better ? { ...now, prev: prev.est } : null
 }
