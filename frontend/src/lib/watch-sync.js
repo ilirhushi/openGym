@@ -26,6 +26,11 @@ export function buildWatchPlanPayload(S, iso = todayISO()) {
     date: iso,
     routineIds: rids,
     name: deriveSessionName(routines.map(r => r.name)),
+    // The Watch has no other way to know this: it renders a weight beside a unit label and
+    // nothing else crosses the WatchConnectivity boundary. Defaulted rather than passed through
+    // bare so a state written before the unit setting existed labels sets "kg" (the app's own
+    // default) instead of leaving the Watch with an empty label.
+    unit: S.unit === 'lb' ? 'lb' : 'kg',
     entries: entries.map(entry => {
       const last = lastEntryFor(S, entry.id)
       return {

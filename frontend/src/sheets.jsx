@@ -30,7 +30,10 @@ import { nextPrescription, applyPrescription, policyFor, defaultIncrement, POLIC
 import { jp3BodyFatPct, jp3SitesFor, navyCircKeysFor, navyBodyFatPct, clampBodyFatPct, lengthUnitFor, bodyFatMethodLabel, clampHeightInches } from './lib/bodyfat.js'
 import { normalizeRepRange } from './lib/rep-range.js'
 import { MOBILE, shareExport, printHtml } from './lib/mobile.js'
+import { convertWeight } from './lib/units.js'
 import { buildCompletedWorkout } from './lib/finish-workout.js'
+import { shouldWriteWorkout, shouldPhoneWriteWatchWorkout, healthWorkoutPayload, bodyWeightPrefill } from './lib/health.js'
+import { saveHealthWorkout, readLatestBodyWeight } from './lib/health-bridge.js'
 import { isWarmupRow, hasCompletedWork } from './lib/workout-model.js'
 import { saveSessionAsRoutine } from './lib/session-routines.js'
 import { nextUnfinishedUnit } from './lib/supersetFlow.js'
@@ -176,9 +179,13 @@ export const starterPlanSheet = () => ui().openSheet(close => <StarterPlanChoose
 // below an everyday squat.
 const W_LO = 1
 const wHi = unit => (unit === 'lb' ? 660 : 300)
+// The one clamp for this range, shared so that anything setting the value from outside the
+// control (the Apple Health prefill, below) lands inside the same bounds the slider enforces
+// rather than pushing the thumb off its own track.
+export const clampWeight = (x, unit) => Math.max(W_LO, Math.min(wHi(unit), Math.round((x || 0) * 10) / 10))
 function WeightInput({ value, setValue, unit }) {
   const W_HI = wHi(unit)
-  const clamp = x => Math.max(W_LO, Math.min(W_HI, Math.round((x || 0) * 10) / 10))
+  const clamp = x => clampWeight(x, unit)
   const sv = Math.max(W_LO, Math.min(W_HI, value))
   const onSlide = v => setValue(clamp(v))
   const onType = v => setValue(v)
@@ -209,6 +216,32 @@ function BwSheet({ required, onDone, close }) {
   const unit = st.unit
   const bw = lastBW(st)
   const [v, setV] = useState(bw ? bw.w : 70)
+  // Whether the user has moved the value themselves. A ref, not state: nothing renders off it,
+  // and it must be readable by a callback that closed over the first render.
+  const touched = useRef(false)
+  const setValue = x => { touched.current = true; setV(x) }
+  // Apple Health prefill: a scale reading from this morning beats last session's number. This
+  // only ever moves the slider, it never writes anything. The user still confirms, and openGym
+  // logs its own entry, so training data is never mutated without them seeing it (spec 3.6).
+  useEffect(() => {
+    if (!MOBILE || st.health !== true) return
+    // Already weighed in today by hand: their own number wins over the scale's.
+    if (st.bodyweight.some(b => b.d === todayISO())) return
+    let cancelled = false
+    readLatestBodyWeight().then(r => {
+      if (cancelled) return
+      // The native read can land after the user has already started nudging the value. Their
+      // own input outranks the scale's: a number that changes under the thumb is worse than no
+      // prefill at all.
+      if (touched.current) return
+      const kg = bodyWeightPrefill(r)
+      if (kg == null) return
+      // Through the same clamp the control's own paths use, so a reading outside the range
+      // cannot put the slider somewhere it can never be dragged back to.
+      setV(clampWeight(convertWeight(kg, 'kg', unit), unit))
+    })
+    return () => { cancelled = true }
+  }, [])
   const save = () => {
     const n = Math.round((v || 0) * 10) / 10
     if (!n || n <= 0) { toast(t('Enter a valid weight')); return }
@@ -237,7 +270,7 @@ function BwSheet({ required, onDone, close }) {
         </div>
       : <h3>{t('Log body weight')}</h3>}
     <div className="muted small">{required ? t('Slide or tap to set your weight — tracked before every workout so your curve stays honest.') : t('Today') + ', ' + fmtDate(todayISO(), true)}</div>
-    <WeightInput value={v} setValue={setV} unit={unit} />
+    <WeightInput value={v} setValue={setValue} unit={unit} />
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{required ? t('Save & start workout') : t('Save')}</Button>
     {required && <>
@@ -2705,6 +2738,13 @@ function doFinishWorkout() {
     s.active = null
   })
   useStore.getState().autoBackupNow()
+  // Apple Health, live finishes only. `past` is the backfill discriminator, so a workout logged
+  // into the past never rewrites the user's Health history (spec section 3.4). Fire-and-forget on
+  // purpose: doFinishWorkout must not become async, must not wait on HealthKit, and a failed
+  // health write must never surface an error over the finish summary. The workout is already in
+  // openGym's own history by this line, so nothing is lost if the write fails.
+  const hd = shouldWriteWorkout({ enabled: st.health === true, past }) ? healthWorkoutPayload(w) : null
+  if (hd) saveHealthWorkout(hd)
   // Nothing of the finished workout may keep counting: a hold that outlived it would log its
   // set into whatever is active next.
   useUI.getState().stopWork()
@@ -2734,7 +2774,22 @@ export function handleIncomingWatchSession(payload, markSeen) {
       const { workouts, exWeights, w, prs, e1prs } = result
       update(s => { s.workouts = workouts; s.exWeights = exWeights })
       useStore.getState().autoBackupNow()
-      markSeen()
+      // The Watch normally saves its own HKWorkout, because only the side that ran the session
+      // can attach its heart-rate samples. When it could not (no authorization on the Watch, or
+      // the save failed), the phone is the only side left that can write it, sensor-less. This
+      // is what keeps the invariant at exactly one health record per session, never zero
+      // (spec section 5.2).
+      const hd = shouldPhoneWriteWatchWorkout(payload, S().health === true) ? healthWorkoutPayload(w) : null
+      // Decided synchronously, above, so the toggle is read at import time (spec section 9.4),
+      // but written only once the seen-ids file has actually landed. Redelivery is the most
+      // likely source of a duplicate record in Health (spec section 9.6): if the process dies
+      // between the write and that file settling, the same session is imported again on next
+      // launch and written a second time. If markSeen itself fails, the write is skipped for the
+      // same reason, and the redelivery that follows is the thing that writes it.
+      Promise.resolve(markSeen()).then(
+        () => { if (hd) saveHealthWorkout(hd) },
+        e => console.error('Watch session markSeen failed, skipping the health write:', e),
+      )
       ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
     },
     askUser: (existing, choose) => {

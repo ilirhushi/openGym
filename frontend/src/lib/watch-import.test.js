@@ -70,3 +70,34 @@ describe('finishWatchSession', () => {
     expect(w.entries[0]).toMatchObject({ rid: 'routine-2', noProg: true })
   })
 })
+
+describe('heart-rate summary from the Watch', () => {
+  const st = { workouts: [], exWeights: {}, unit: 'kg' }
+
+  it('stores avg, max and kcal on the workout record', () => {
+    const r = finishWatchSession(st, payload({ health: { saved: true, avgHr: 142, maxHr: 171, kcal: 486 } }))
+    expect(r.w.hr).toEqual({ avg: 142, max: 171, kcal: 486 })
+  })
+
+  it('omits hr entirely when the Watch sent no health object', () => {
+    const r = finishWatchSession(st, payload())
+    expect('hr' in r.w).toBe(false)
+  })
+
+  // saved:false means the session ran with sensors but the HKWorkout save failed. The figures
+  // are still real and still worth keeping; only the "already in Health" claim is false.
+  it('keeps the figures even when the Watch could not save to Health', () => {
+    const r = finishWatchSession(st, payload({ health: { saved: false, avgHr: 130, maxHr: 150, kcal: 300 } }))
+    expect(r.w.hr).toEqual({ avg: 130, max: 150, kcal: 300 })
+  })
+
+  it('writes only the figures that are present', () => {
+    const r = finishWatchSession(st, payload({ health: { saved: true, avgHr: 142 } }))
+    expect(r.w.hr).toEqual({ avg: 142 })
+  })
+
+  it('omits hr when the health object carries no figures at all', () => {
+    const r = finishWatchSession(st, payload({ health: { saved: false } }))
+    expect('hr' in r.w).toBe(false)
+  })
+})

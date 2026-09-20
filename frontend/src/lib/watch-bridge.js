@@ -27,13 +27,26 @@ export function planPushPayload(S, iso) {
   return buildWatchPlanPayload(S, iso)
 }
 
+// The loaded plugin travels inside a plain object, never as a promise's own value — exactly the
+// same wrapper, and for exactly the same reason, as coach-secrets.js's plugin() (issues #42,
+// #58). Capacitor's registerPlugin() hands out a Proxy whose get-trap answers EVERY property
+// name with a native-method wrapper, `then` included (it special-cases only `$$typeof` and
+// `toJSON` — see @capacitor/core's registerPlugin). A promise that resolves to the proxy itself
+// therefore takes it for a thenable and calls proxy.then(resolve, reject); that wrapper drops
+// both callbacks on the floor, so the promise never settles and the await hangs forever with no
+// error. `then` isn't a declared plugin method either, so it never even reaches the native side
+// — there is no failed call to see, only silence.
+//
+// Note this applies to an `async function`'s return value too, not just an explicit .then():
+// `async function plugin() { return proxy }` assimilates the proxy the same way. Hence the box,
+// and hence a plain function rather than an async one.
 let pluginPromise = null
-async function plugin() {
-  if (!MOBILE) return null
+function plugin() {
+  if (!MOBILE) return Promise.resolve({ p: null })
   if (!pluginPromise) {
     pluginPromise = import('@capacitor/core')
-      .then(({ registerPlugin }) => registerPlugin('WatchBridge'))
-      .catch(e => { console.error('WatchBridge plugin unavailable:', e); return null })
+      .then(({ registerPlugin }) => ({ p: registerPlugin('WatchBridge') }))
+      .catch(e => { console.error('WatchBridge plugin unavailable:', e); return { p: null } })
   }
   return pluginPromise
 }
@@ -42,7 +55,7 @@ async function plugin() {
  * no paired Watch, or no plan that day: there is nothing the caller needs to react to either way. */
 export async function syncTodayPlanToWatch(S, iso) {
   const payload = planPushPayload(S, iso)
-  const p = await plugin()
+  const { p } = await plugin()
   if (!p) return
   try { await p.syncTodayPlan({ payload: payload ? JSON.stringify(payload) : null }) } catch (e) { /* no paired Watch */ }
 }
@@ -70,7 +83,7 @@ export function decideWatchImport(getState, payload, { apply, askUser }) {
 /** Watch-pairing status for Settings' "Apple Watch" row: null off mobile, on a non-iOS platform,
  * or if the native call fails; otherwise { supported, paired, watchAppInstalled, reachable }. */
 export async function getWatchStatus() {
-  const p = await plugin()
+  const { p } = await plugin()
   if (!p) return null
   try { return await p.getStatus() } catch (e) { console.error('WatchBridge.getStatus failed:', e); return null }
 }
@@ -82,7 +95,7 @@ export async function getWatchStatus() {
  * app killed) before the user chooses loses the workout for good: nothing else holds a durable
  * copy of it once this event has fired, and it isn't redelivered on demand. No-op off mobile. */
 export async function initWatchBridge(onSession) {
-  const p = await plugin()
+  const { p } = await plugin()
   if (!p) return
   let seenIds = (await readJsonFile(SEEN_FILE)) || []
   p.addListener('watchSessionReceived', async ev => {

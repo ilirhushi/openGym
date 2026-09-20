@@ -10,7 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 // only exists on the native iOS build — never on the web, never on Android. Each test flips the
 // platform gates (MOBILE, isIOS) and the native getWatchStatus() result.
 const mocks = vi.hoisted(() => {
-  const state = { S: null, MOBILE: false, ios: false, watchStatus: null }
+  const state = { S: null, MOBILE: false, ios: false, watchStatus: null, healthAuth: null, healthStatus: null }
   state.snapshot = () => ({
     S: state.S,
     user: null,
@@ -50,6 +50,11 @@ vi.mock('../lib/mobile.js', () => ({
 vi.mock('../lib/watch-bridge.js', () => ({
   getWatchStatus: () => Promise.resolve(mocks.watchStatus),
 }))
+vi.mock('../lib/health-bridge.js', () => ({
+  requestHealthPermissions: () => Promise.resolve(null),
+  getHealthAuth: () => Promise.resolve(mocks.healthAuth),
+  readHealthStatus: () => Promise.resolve(mocks.healthStatus),
+}))
 vi.mock('../lib/update.js', () => ({ checkForUpdate: vi.fn(() => Promise.resolve(null)), downloadAndInstall: vi.fn() }))
 vi.mock('./MobileOnboarding.jsx', () => ({ ConnectSheet: () => null }))
 vi.mock('../sheets.jsx', () => ({
@@ -68,6 +73,8 @@ beforeEach(() => {
   mocks.MOBILE = false
   mocks.ios = false
   mocks.watchStatus = null
+  mocks.healthAuth = null
+  mocks.healthStatus = null
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -83,6 +90,8 @@ const mount = async () => {
 }
 const watchSection = () => [...host.querySelectorAll('.lrow')].find(r =>
   r.textContent.includes('Connected') || r.textContent.includes('Watch app not installed') || r.textContent.includes('No Apple Watch paired'))
+const healthRow = () => [...host.querySelectorAll('.lrow')].find(r => r.textContent.includes('Save workouts to Health'))
+const healthFailRow = () => [...host.querySelectorAll('.lrow')].find(r => r.textContent.includes('Last write failed'))
 
 describe('Settings — Apple Watch companion status', () => {
   it('web build: no section, never asks for status', async () => {
@@ -119,5 +128,74 @@ describe('Settings — Apple Watch companion status', () => {
     mocks.watchStatus = { supported: true, paired: true, watchAppInstalled: true, reachable: true }
     await mount()
     expect(watchSection().textContent).toContain('Connected')
+  })
+})
+
+
+// The Apple Health section (docs/superpowers/specs/2026-09-20-health-integration-design.md
+// section 6.1) is gated `MOBILE && isIOS()` for the same reason the Watch rows are: HealthKit
+// exists on neither the web build nor Android, and Health Connect is a separate spec entirely.
+describe('Settings, Apple Health section', () => {
+  it('web build: no section', async () => {
+    await mount()
+    expect(healthRow()).toBeUndefined()
+  })
+
+  it('mobile build off iOS (Android): no section', async () => {
+    mocks.MOBILE = true
+    mocks.ios = false
+    await mount()
+    expect(healthRow()).toBeUndefined()
+  })
+
+  it('iOS: shows the opt-in row, off by default', async () => {
+    mocks.MOBILE = true
+    mocks.ios = true
+    await mount()
+    expect(healthRow()).toBeDefined()
+    expect(healthRow().querySelector('[role=switch]').getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('iOS with the toggle on: reflects the stored opt-in', async () => {
+    mocks.MOBILE = true
+    mocks.ios = true
+    mocks.S.health = true
+    await mount()
+    expect(healthRow().querySelector('[role=switch]').getAttribute('aria-checked')).toBe('true')
+  })
+
+  // The failed-write line is passive by design (spec section 7): it never interrupts a finish,
+  // it only reports afterwards, and only when there is something to report.
+  it('iOS: no failed-write line while the last write succeeded', async () => {
+    mocks.MOBILE = true
+    mocks.ios = true
+    mocks.S.health = true
+    mocks.healthStatus = { ok: true, at: Date.UTC(2026, 8, 20, 21, 30) }
+    await mount()
+    expect(healthFailRow()).toBeUndefined()
+  })
+
+  // Dated locally, not in UTC: a write failing at 23:30 in UTC+2 belongs to that evening, not to
+  // the following day.
+  it('iOS: dates the failed-write line in local time', async () => {
+    mocks.MOBILE = true
+    mocks.ios = true
+    mocks.S.health = true
+    const at = new Date(2026, 8, 20, 23, 30)
+    mocks.healthStatus = { ok: false, at: at.getTime() }
+    await mount()
+    expect(healthFailRow()).toBeDefined()
+    expect(healthFailRow().textContent).toContain('20')
+    expect(healthFailRow().textContent).not.toContain('21')
+  })
+
+  // A status file missing `at` must not take the whole screen down over one cosmetic line.
+  it('iOS: survives a status file with no timestamp', async () => {
+    mocks.MOBILE = true
+    mocks.ios = true
+    mocks.S.health = true
+    mocks.healthStatus = { ok: false }
+    await mount()
+    expect(healthFailRow()).toBeDefined()
   })
 })

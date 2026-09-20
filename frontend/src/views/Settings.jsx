@@ -4,7 +4,7 @@ import { useStore, DEF, hasData } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { convertStateUnit } from '../lib/units.js'
 import { useUI } from '../store/useUI.js'
-import { ACCENTS, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate, fmtNum } from '../lib/format.js'
+import { ACCENTS, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate, fmtNum, fmtDate, isoOf } from '../lib/format.js'
 import { inventoryFor } from '../lib/plates.js'
 import { formatFtIn, clampHeightInches, inToCm } from '../lib/bodyfat.js'
 import { effortOf } from '../lib/history.js'
@@ -16,6 +16,7 @@ import { t, LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, baseLang } from '../lib/i18
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, isAndroid, isIOS, shareExport, syncReminder } from '../lib/mobile.js'
 import { getWatchStatus } from '../lib/watch-bridge.js'
+import { requestHealthPermissions, getHealthAuth, readHealthStatus } from '../lib/health-bridge.js'
 import { checkForUpdate, downloadAndInstall } from '../lib/update.js'
 import { forgetCoach } from '../lib/coach-api.js'
 import { ConnectSheet } from './MobileOnboarding.jsx'
@@ -95,6 +96,18 @@ export default function Settings() {
   useEffect(() => {
     if (!MOBILE) return
     isIOS().then(ok => { setIos(ok); if (ok) getWatchStatus().then(setWatchStatus) })
+  }, [])
+
+  // --- Apple Health ---
+  const [healthAuth, setHealthAuth] = useState(null)   // { write } | null
+  const [healthStatus, setHealthStatus] = useState(null) // { ok, at } | null
+  useEffect(() => {
+    if (!MOBILE) return
+    isIOS().then(ok => {
+      if (!ok) return
+      getHealthAuth().then(setHealthAuth)
+      readHealthStatus().then(setHealthStatus)
+    })
   }, [])
 
   // The same check, on demand: the automatic one is silent when it finds nothing or cannot
@@ -278,6 +291,31 @@ export default function Settings() {
       ) : (
         <Row icon="clock" iconTint="var(--grey)" title={t('No Apple Watch paired')}
           subtitle={t('Pair a watch to this iPhone in the Apple Watch app to use it with openGym.')} />
+      )}
+    </Section>}
+
+    {/* ---------- Apple Health (docs/superpowers/specs/2026-09-20-health-integration-design.md) ---------- */}
+    {MOBILE && ios && <Section title={t('Apple Health')}
+      footer={S.health && healthAuth && healthAuth.write === false
+        ? t('Writing is turned off for openGym in the Health app. Open Health, then Sharing, Apps, openGym to allow it.')
+        : t('Only workouts you finish on this phone are written. Past workouts you log later, edits, and imports are not.')}>
+      <Row icon="heart" iconTint="var(--red)" title={t('Save workouts to Health')}
+        subtitle={t('Writes the workout time and type when you finish a session. No calories are estimated.')}>
+        <Switch checked={S.health === true} onChange={async v => {
+          if (!v) { update(s => { s.health = false }); return }
+          // The permission sheet is only ever raised by this tap, never at launch.
+          const r = await requestHealthPermissions()
+          setHealthAuth(r)
+          update(s => { s.health = true })
+        }} />
+      </Row>
+      {/* isoOf, not toISOString(): the rest of the app dates things locally, and a write that
+          failed at 23:30 in UTC+2 would otherwise be reported as having failed tomorrow. The
+          `at` guard is belt and braces: a status file without it would throw here and take the
+          whole Settings screen down over a cosmetic line. */}
+      {S.health && healthStatus && healthStatus.ok === false && (
+        <Row icon="clock" iconTint="var(--orange)" title={t('Last write failed')}
+          subtitle={Number.isFinite(healthStatus.at) ? fmtDate(isoOf(new Date(healthStatus.at)), true) : ''} />
       )}
     </Section>}
 

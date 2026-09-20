@@ -32,6 +32,16 @@ struct WatchPlan: Codable {
     var name: String?
     var entries: [WatchEntry]
     var activeOnPhone: Bool
+    // How the phone labels a weight, "kg" or "lb" (watch-sync.js's buildWatchPlanPayload). The
+    // Watch has no other source for it and must not guess: labelling a pound lifter's sets "kg"
+    // is worse than showing a bare number.
+    //
+    // Optional on purpose, and it must stay that way. Both of these decode from UserDefaults,
+    // so a plan or an in-progress session persisted by a build that predates this field has no
+    // "unit" key. A non-optional String would make that decode throw, load() would swallow it as
+    // nil, and the Watch would drop back to "Not synced yet" (or lose a running session) on the
+    // first launch after an update.
+    var unit: String?
 }
 
 // The Watch's own copy of an in-progress or finished session — independent of `plan` once
@@ -45,6 +55,7 @@ struct WatchActiveSession: Codable, Identifiable, Hashable {
     var routineIds: [String]
     var name: String?
     var entries: [WatchEntry]
+    var unit: String?   // carried from the plan at Start, see WatchPlan.unit
 }
 
 final class WatchSessionStore: ObservableObject {
@@ -82,7 +93,10 @@ final class WatchSessionStore: ObservableObject {
         let session = WatchActiveSession(
             watchSessionId: UUID().uuidString,
             date: todayISO(), start: Date().timeIntervalSince1970 * 1000,
-            routineIds: plan.routineIds, name: plan.name, entries: plan.entries
+            routineIds: plan.routineIds, name: plan.name, entries: plan.entries,
+            // Snapshotted with the rest of the plan at Start: a session already under way keeps
+            // the unit it began with, the same way it keeps its entries (design doc §5.1).
+            unit: plan.unit
         )
         activeSession = session
         Self.save(session, key: sessionKey, to: defaults)

@@ -31,6 +31,11 @@ export const DEF = {
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   // Stats activity heatmap metric. Profiles without this key continue to open on time.
   heatmapMetric: 'time',
+  // Apple Health sync, off until the user turns it on in Settings (iOS mobile build only).
+  // Read at finish time, never captured at workout start, so turning it off mid-session takes
+  // effect immediately. Nothing is sent to any third party and openGym never phones home; the
+  // hr summary rides on the workout record, so it syncs to your own server along with it.
+  health: false,
   // How the active workout is laid out — 'cards' (one exercise at a time with Prev/Next),
   // 'list' (every exercise stacked and scrollable) or 'compact' (that stack stripped to just
   // names and set rows — no media, tags, notes, last-time or progression line). Purely
@@ -707,6 +712,7 @@ export const useStore = create((set, get) => {
             else { get().setUser(remote.user); setSync({ offline: true }) }   // offline — keep going from the last-synced local copy
           }
           syncReminder(get().S)
+          syncTodayPlanToWatch(get().S)
           finishBoot()
           return
         }
@@ -719,6 +725,13 @@ export const useStore = create((set, get) => {
         }
         get().setGuest(true)
         syncReminder(get().S)
+        // A cold launch is the one moment the Watch can't learn the plan any other way: the only
+        // other pushes are nativePersist's (which needs the state to actually change) and
+        // onAppActive's (Capacitor's appStateChange fires on a background->foreground
+        // transition, never on first launch). Without this, a freshly-installed or freshly-
+        // restarted phone leaves the Watch on "Not synced yet" until you happen to edit
+        // something or background the app.
+        syncTodayPlanToWatch(get().S)
         // Only a genuinely first launch — nothing chosen yet and nothing to lose either — offers
         // the choice. Picking local (even with no data yet) persists that choice below and this
         // never asks again.

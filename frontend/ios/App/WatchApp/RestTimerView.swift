@@ -77,25 +77,3 @@ final class RestTimerRunner: NSObject, ObservableObject, WKExtendedRuntimeSessio
         onDone?()
     }
 }
-
-struct RestTimerView: View {
-    @StateObject private var runner: RestTimerRunner
-    var onDone: () -> Void
-
-    init(seconds: Int, onDone: @escaping () -> Void) {
-        self.onDone = onDone
-        _runner = StateObject(wrappedValue: RestTimerRunner(seconds: seconds))
-    }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Text("\(runner.remaining)s").font(.system(size: 40, weight: .bold, design: .rounded))
-            Button("Skip") { runner.skip() }
-        }
-        .onAppear {
-            runner.onDone = onDone
-            runner.start()
-        }
-        .onDisappear { runner.cancel() }
-    }
-}
