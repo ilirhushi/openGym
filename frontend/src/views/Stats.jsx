@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { EXIDX, matchExercise, isAssisted } from '../lib/exercises.js'
-import { lastBW, streakWeeks, setLabel, modeOf, effortOf, entriesForExercise, metricEntriesForExercise, metricModeForEntry, bestWeightForEntry, completedRepsOf } from '../lib/history.js'
+import { lastBW, streakWeeks, setLabel, modeOf, effortOf, entriesForExercise, metricEntriesForExercise, metricModeForEntry, bestWeightForEntry, completedRepsOf, metresToDisplay, distanceUnitLabel } from '../lib/history.js'
 import { fmtNum, fmtDate, fmtVol, todayISO, weekStartOf } from '../lib/format.js'
 import { t, exerciseNameFor, getLang } from '../lib/i18n.js'
 import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor } from '../sheets.jsx'
@@ -344,10 +344,11 @@ export default function Stats() {
       if (!data.mode) continue
       const mode = data.mode
       const rows = data.rows
-      const mx = mode === 'reps'
-        ? data.best
-        : Math.max(0, ...rows.map(s => mode === 'cardio' ? (s.speed || 0) : mode === 'time' ? (s.sec || 0) : (s.w || 0)))
-      if (mx > 0) return { mx, unit: mode === 'cardio' ? 'km/h' : mode === 'time' ? 's' : S.unit }
+      const metric = s2 => mode === 'cardio' ? (s2.speed || 0) : mode === 'distance' ? (s2.m || 0) : mode === 'time' ? (s2.sec || 0) : (s2.w || 0)
+      const mx = mode === 'reps' ? data.best : Math.max(0, ...rows.map(metric))
+      // Distance is stored in metres and shown in the profile's unit (see fmtDistance) —
+      // the headline number converts with it so the label never lies about the value.
+      if (mx > 0) return { mx: mode === 'distance' ? metresToDisplay(mx, S.unit) : mx, unit: mode === 'cardio' ? 'km/h' : mode === 'distance' ? distanceUnitLabel(S.unit) : mode === 'time' ? 's' : S.unit }
       // Unloaded reps work still has a current figure — its rep count. Without this the whole
       // picker label went blank and the exercise sorted to the bottom as if it had no history.
       if (mode === 'reps') {
@@ -377,6 +378,7 @@ export default function Stats() {
   })() : 'reps'
   const curCardio = curMode === 'cardio'
   const curTimed = curMode === 'time'
+  const curDist = curMode === 'distance'
   // A pull-up or a push-up carries no weight, so its "best weight" is 0 — and dropping every
   // zero point left the card reading "No data yet" for exercises with a full history behind
   // them (issue #5). When nothing in an exercise's history was ever loaded, the progress IS
@@ -384,8 +386,10 @@ export default function Stats() {
   // its own, which is also the honest reading: that is when load became the thing improving.
   const repsOnly = curEx && curMode === 'reps' && !workouts.some(w =>
     entriesForExercise(w, curEx).some(en => bestWeightForEntry(en) > 0))
-  const metric = s => curCardio ? (s.speed || 0) : curTimed ? (s.sec || 0) : (s.w || 0)
-  const exUnit = curCardio ? 'km/h' : curTimed ? 's' : repsOnly ? t('reps') : S.unit
+  const metric = s => curCardio ? (s.speed || 0) : curDist ? (s.m || 0) : curTimed ? (s.sec || 0) : (s.w || 0)
+  // Distance converts at display time like the headline above — metres stored, feet shown.
+  const exUnit = curCardio ? 'km/h' : curDist ? (S.unit === 'lb' ? 'ft' : 'm') : curTimed ? 's' : repsOnly ? t('reps') : S.unit
+  const toExUnit = v => curDist ? metresToDisplay(v, S.unit) : v
   let exPts = [], exList = [], exBest = 0
   if (curEx) {
     workouts.forEach(w => {
@@ -393,13 +397,14 @@ export default function Stats() {
       if (data.mode === curMode) {
         const doneSets = data.rows
         const representative = data.entries.at(-1)?.entry
-        const mx = curMode === 'reps'
+        const mxRaw = curMode === 'reps'
           ? (repsOnly ? Math.max(0, ...doneSets.map(completedRepsOf)) : data.best)
           : Math.max(0, ...doneSets.map(metric))
-        if (mx > 0) {
-          exPts.push({ t: w.start, y: mx, d: w.d, sets: doneSets, target: representative?.target })
-          if (!exBest) exBest = mx
-          else if (isAssisted(curEx) ? mx < exBest : mx > exBest) exBest = mx
+        if (mxRaw > 0) {
+          const y = toExUnit(mxRaw)
+          exPts.push({ t: w.start, y, d: w.d, sets: doneSets, target: representative?.target })
+          if (!exBest) exBest = y
+          else if (isAssisted(curEx) ? y < exBest : y > exBest) exBest = y
         }
       }
     })
@@ -490,9 +495,9 @@ export default function Stats() {
               : <LineChart points={onE1 ? e1ChartPts : topPts} h={150} unit={exUnit} color="var(--blue)" />}
           </div>
           <div style={{ marginTop: 8 }}>{exList.map((p, i) => <div key={i} className="row between small" style={{ padding: '6px 0', borderBottom: 'var(--hair) solid var(--sep)' }}>
-            <span className="muted">{fmtDate(p.d, true)}</span><span>{p.sets.map(s => setLabel(curEx, s, p.target)).join('  ')}</span></div>)}</div>
+            <span className="muted">{fmtDate(p.d, true)}</span><span>{p.sets.map(s => setLabel(curEx, s, p.target, S.unit)).join('  ')}</span></div>)}</div>
           <div className="small dim" style={{ marginTop: 8 }}>
-            {onEff ? t('Average effort per workout') : onE1 ? t('Estimated 1RM per workout') : curCardio ? t('Top speed per workout') : curTimed ? t('Longest hold per workout') : repsOnly ? t('Most reps in a set per workout') : t('Best set weight per workout')}
+            {onEff ? t('Average effort per workout') : onE1 ? t('Estimated 1RM per workout') : curCardio ? t('Top speed per workout') : curDist ? t('Farthest distance per workout') : curTimed ? t('Longest hold per workout') : repsOnly ? t('Most reps in a set per workout') : t('Best set weight per workout')}
             {onEff ? '' : <> · {t('Best:')}{' '}<b className="accent">{fmtNum(onE1 ? e1Best.est : exBest)} {onE1 ? S.unit : exUnit}</b></>}
           </div>
           {onE1 && <div className="small dim" style={{ marginTop: 4 }}>
