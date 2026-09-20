@@ -1252,6 +1252,13 @@ export default {
   '{0} %': '{0} %',
   '{0} MB': '{0} MB',
   'Checksum not available — not installing': 'Ellenőrző összeg nem érhető el — nincs telepítés',
+  // --- coach week (Home progress row, components/QueueRow.jsx; day sheet, sheets.jsx) ---
+  'Next: {0}, today': 'Következő: {0}, ma',
+  'Next: {0}': 'Következő: {0}',
+  'Next week starts {0}': 'A következő hét kezdete: {0}',
+  'Week complete, ask the coach': 'A hét kész, kérdezd az edzőt',
+  'Up next': 'Következő',
+  'Later': 'Később',
   // --- combine routines / layout / deload (v1.3.6) ---
   'Add routine': 'Rutin hozzáadása',
   'Bring another routine into this session': 'Másik rutin behozása ebbe az edzésbe',
@@ -1305,4 +1312,5 @@ export default {
   'This workout changed on another device. Your edits are still here.': 'Ezt az edzést egy másik eszközön módosították. A módosításaid továbbra is itt vannak.',
   'Close editor': 'Szerkesztő bezárása',
   'Editing a saved workout. Date and duration stay unchanged.': 'Mentett edzést szerkesztesz. A dátum és az időtartam változatlan marad.',
+  'Coach week': 'Edzői hét',
 }

@@ -1254,6 +1254,13 @@ export default {
   '{0} %': '{0}%',
   '{0} MB': '{0} MB',
   'Checksum not available — not installing': '체크섬을 확인할 수 없어 설치하지 않습니다',
+  // --- coach week (Home progress row, components/QueueRow.jsx; day sheet, sheets.jsx) ---
+  'Next: {0}, today': '다음: {0}, 오늘',
+  'Next: {0}': '다음: {0}',
+  'Next week starts {0}': '다음 주는 {0}에 시작됩니다',
+  'Week complete, ask the coach': '주 완료, 코치에게 문의하세요',
+  'Up next': '다음',
+  'Later': '나중에',
   // --- combine routines / layout / deload (v1.3.6) ---
   'Add routine': '루틴 추가',
   'Bring another routine into this session': '이 세션에 다른 루틴 가져오기',
@@ -1302,4 +1309,5 @@ export default {
   'This workout changed on another device. Your edits are still here.': '이 운동은 다른 기기에서 변경되었습니다. 편집 내용은 여기에 남아 있습니다.',
   'Close editor': '편집기 닫기',
   'Editing a saved workout. Date and duration stay unchanged.': '저장된 운동을 편집 중입니다. 날짜와 시간은 변경되지 않습니다.',
+  'Coach week': '코치 주간',
 }

@@ -1254,6 +1254,13 @@ export default {
   '{0} %': '{0} %',
   '{0} MB': '{0} МБ',
   'Checksum not available — not installing': 'Контрольная сумма недоступна — установка отменена',
+  // --- coach week (Home progress row, components/QueueRow.jsx; day sheet, sheets.jsx) ---
+  'Next: {0}, today': 'Далее: {0}, сегодня',
+  'Next: {0}': 'Далее: {0}',
+  'Next week starts {0}': 'Следующая неделя начнётся {0}',
+  'Week complete, ask the coach': 'Неделя завершена, спросите тренера',
+  'Up next': 'Далее',
+  'Later': 'Позже',
   // --- combine routines / layout / deload (v1.3.6) ---
   'Add routine': 'Добавить программу',
   'Bring another routine into this session': 'Добавить ещё одну программу в эту тренировку',
@@ -1302,4 +1309,5 @@ export default {
   'This workout changed on another device. Your edits are still here.': 'Эта тренировка изменена на другом устройстве. Ваши изменения всё ещё здесь.',
   'Close editor': 'Закрыть редактор',
   'Editing a saved workout. Date and duration stay unchanged.': 'Вы редактируете сохранённую тренировку. Дата и длительность не изменятся.',
+  'Coach week': 'Неделя тренера',
 }
