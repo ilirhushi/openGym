@@ -30,10 +30,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../store/useStore.js', () => ({
   useStore: selector => selector({ S: mocks.S }),
 }))
-vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }))
+vi.mock('react-router-dom', () => ({ useNavigate: () => () => {}, useLocation: () => ({ hash: '' }) }))
 vi.mock('../sheets.jsx', () => ({
   bwSheet: () => {}, goalSheet: () => {}, calendarSheet: () => {}, workoutDetailSheet: () => {},
   WorkoutRow: () => React.createElement('div'), bwDeltaColor: () => 'inherit',
+  bfSheet: () => {}, bfGoalSheet: () => {}, bfDeltaColor: () => 'inherit',
 }))
 vi.mock('../components/LineChart.jsx', () => ({ default: props => {
   mocks.charts.push(props)

@@ -42,7 +42,7 @@ vi.mock('../store/useUI.js', () => {
   useUI.getState = snap
   return { useUI }
 })
-vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }))
+vi.mock('react-router-dom', () => ({ useNavigate: () => () => {}, useLocation: () => ({ hash: '' }) }))
 vi.mock('../lib/api.js', () => ({
   api: (...a) => mocks.api(...a), webauthnOK: () => false, passkeyLogin: vi.fn(), passkeyRegister: vi.fn(), IS_ANDROID: false,
 }))

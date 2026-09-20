@@ -10,10 +10,11 @@ import { starterPlanSheet } from '../sheets.jsx'
 import Home from './Home.jsx'
 import Plan from './Plan.jsx'
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }))
+vi.mock('react-router-dom', () => ({ useNavigate: () => () => {}, useLocation: () => ({ hash: '' }) }))
 vi.mock('../sheets.jsx', () => ({
   starterPlanSheet: vi.fn(), bwSheet: vi.fn(), goalSheet: vi.fn(), dayOverrideSheet: vi.fn(),
   calendarSheet: vi.fn(), startFlow: vi.fn(), bwDeltaColor: () => '',
+  bfSheet: vi.fn(), bfGoalSheet: vi.fn(), bfDeltaColor: () => '',
   dayAssignSheet: vi.fn(), planToolsSheet: vi.fn(),
 }))
 
