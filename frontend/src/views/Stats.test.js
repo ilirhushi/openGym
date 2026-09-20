@@ -5,6 +5,9 @@ import { bestWeightForEntry, metricModeForEntry, metricRowsForEntry } from '../l
 const source = readFileSync(new URL('./Stats.jsx', import.meta.url), 'utf8')
 const uiSource = readFileSync(new URL('../components/ui.jsx', import.meta.url), 'utf8')
 const cssSource = readFileSync(new URL('../index.css', import.meta.url), 'utf8')
+// Stats.jsx's own metricDataOf was deduplicated into lib/records.js (metricDataOf is now
+// imported from there), so the metricEntriesForExercise call now lives in that file instead.
+const recordsSource = readFileSync(new URL('../lib/records.js', import.meta.url), 'utf8')
 
 describe('Stats mixed-entry metric contract', () => {
   it('selects authoritative reps rows before timed rows without stale topW', () => {
@@ -24,7 +27,7 @@ describe('Stats mixed-entry metric contract', () => {
 
   it('uses the shared metric mode and occurrence helpers rather than entryMode as a chart gate', () => {
     expect(source).toContain('metricModeForEntry')
-    expect(source).toContain('metricEntriesForExercise')
+    expect(recordsSource).toContain('metricEntriesForExercise')
     expect(source).toContain('completedRepsOf')
     expect(source).toContain('bestWeightForEntry')
     expect(source).not.toContain('const loggedMode = entryMode(en)')

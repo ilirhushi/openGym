@@ -737,7 +737,17 @@ export const PT_BR_OVERRIDES = {
   'Up next': 'Próximo',
   'Later': 'Depois',
   'Coach week': 'Semana do Coach',
+  'Training Volume': 'Volume de treino',
+  'Frequency': 'Frequência',
+  'workouts': 'treinos',
+  'Not enough weeks of training yet.': 'Ainda não há semanas de treino suficientes.',
+  'Last 4 weeks vs. the 4 before:': 'Últimas 4 semanas em comparação com as 4 anteriores:',
+  'Personal Records': 'Recordes pessoais',
+  'No personal records yet.': 'Ainda sem recordes pessoais.',
+  '+{0} more': '+{0} a mais',
+  'Needs Attention': 'Precisa de atenção',
+  '{0} sessions without progressing': '{0} sessões sem progresso',
+  'No improvement in {0} sessions': 'Sem melhora em {0} sessões',
 }
-
 export default { ...pt, ...PT_BR_OVERRIDES }
 
