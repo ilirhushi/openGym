@@ -19,7 +19,7 @@ describe('Brazilian Portuguese exercise instructions', () => {
 
   test('completes Stage 1 waist and core coverage', () => {
     const stage = EXDB.filter(exercise => exercise.bp === 'waist')
-    expect(stage).toHaveLength(169)
+    expect(stage).toHaveLength(170)
     stage.forEach(exercise => expect(ptBR, exercise.id).toHaveProperty(exercise.id))
   })
 
