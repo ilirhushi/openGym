@@ -307,6 +307,8 @@ export default {
   'synced with your profile': 'प्रोफ़ाइल से सिंक',
   'Language': 'भाषा',
   "Exercise instructions aren't available in this language yet — they stay in English.": 'व्यायाम निर्देश अभी इस भाषा में उपलब्ध नहीं — वे अंग्रेज़ी में रहेंगे।',
+  'English exercise names': 'व्यायाम के नाम अंग्रेज़ी में',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': 'अनुवादित नाम के आगे कोष्ठक में अंग्रेज़ी नाम दिखाएँ। हर भाषा अपनी पसंद याद रखती है।',
   'Theme': 'थीम',
   'Dark': 'डार्क',
   'Light': 'लाइट',

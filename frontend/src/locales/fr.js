@@ -307,6 +307,8 @@ export default {
   'synced with your profile': 'synchronisé avec ton profil',
   'Language': 'Langue',
   "Exercise instructions aren't available in this language yet — they stay in English.": 'Les instructions des exercices ne sont pas encore disponibles dans cette langue — elles restent en anglais.',
+  'English exercise names': 'Noms d\'exercices en anglais',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': 'Afficher le nom anglais entre parenthèses à côté du nom traduit. Chaque langue retient son propre choix.',
   'Theme': 'Thème',
   'Dark': 'Sombre',
   'Light': 'Clair',

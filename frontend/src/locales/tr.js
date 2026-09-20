@@ -307,6 +307,8 @@ export default {
   'synced with your profile': 'profilinle eşitlenir',
   'Language': 'Dil',
   "Exercise instructions aren't available in this language yet — they stay in English.": 'Egzersiz talimatları bu dilde henüz yok — İngilizce kalır.',
+  'English exercise names': 'İngilizce egzersiz adları',
+  'Show the English name in parentheses next to the translated one. Each language remembers its own choice.': 'Çevrilen adın yanında parantez içinde İngilizce adı göster. Her dil kendi seçimini hatırlar.',
   'Theme': 'Tema',
   'Dark': 'Koyu',
   'Light': 'Açık',
