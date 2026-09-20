@@ -91,25 +91,40 @@ struct SessionView: View {
                 // Phase and the countdown share a line. Vertical space is the scarcest thing on
                 // this screen and neither is worth a line of its own; the countdown is also only
                 // present some of the time, so giving it its own row would make the card jump.
-                HStack(spacing: 6) {
-                    Text(entry.label)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Spacer(minLength: 0)
-                    // One slot, two states, never both at once. While a rest is running the
-                    // countdown is the only thing here worth the width; the rest of the time it
-                    // falls back to where you are in the exercise.
-                    if i == exerciseIndex, let restRunner {
-                        RestLine(runner: restRunner)
-                    } else {
-                        Text(positionLabel(entryIndex: i, setIndex: j))
-                    }
-                }
-                .font(.caption2)
-                .foregroundStyle(WatchPalette.dim)
+                // The name gets the whole row and up to two lines. Exercise names in the library
+                // are long and front-loaded with the equipment ("Dumbbell Incline Bench Press"),
+                // so a single elided line strands you on "Dumbbell ..." which identifies nothing.
+                // Nothing shares this row any more: the position indicator that used to sit here
+                // was costing the name roughly a third of the width to repeat what the rail at
+                // the bottom of the card already shows.
+                Text(entry.label)
+                    .font(.caption)
+                    .foregroundStyle(WatchPalette.dim)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                    // Truncate the middle, not the tail. The library's longest names are
+                    // distinguished by their endings, not their beginnings: "calf raise (tennis
+                    // ball between ankles)" and "... between knees)" differ only in the last
+                    // word, and tail truncation renders the two identical on screen. Keeping
+                    // both ends keeps the equipment and the qualifier that tells them apart.
+                    .truncationMode(.middle)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
 
                 Spacer(minLength: 0)
                 valueBlock(entryIndex: i, setIndex: j, set: set)
+
+                // Both of these are conditional, so this line costs nothing on an ordinary work
+                // set. A running countdown wins the slot: mid-rest it is the only thing changing
+                // and the thing you are actually waiting on.
+                if i == exerciseIndex, let restRunner {
+                    RestLine(runner: restRunner)
+                } else if set.phase == "warmup" {
+                    Text(positionLabel(entryIndex: i, setIndex: j))
+                        .font(.caption2)
+                        .foregroundStyle(WatchPalette.dim)
+                }
+
                 Spacer(minLength: 0)
 
                 Button {
@@ -133,6 +148,12 @@ struct SessionView: View {
             }
             .padding(.horizontal, 6)
             .padding(.bottom, 2)
+            // A TabView page's content area runs under the toolbar strip, and this VStack
+            // centres itself in it, so a name that wraps to a second line grows upward and the
+            // first line disappears behind the clock and Finish. Keeping the card inside the
+            // safe area is what stops that.
+            .padding(.top, 4)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
