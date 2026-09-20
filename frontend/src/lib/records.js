@@ -18,7 +18,7 @@ export function metricDataOf(workout, id) {
   return { mode, entries: sameMode, rows: sameMode.flatMap(item => item.rows), best }
 }
 
-const rowMetric = (mode, row) =>
+export const rowMetric = (mode, row) =>
   mode === 'cardio' ? (row.speed || 0)
     : mode === 'distance' ? (row.m || 0)
       : mode === 'time' ? (row.sec || 0)

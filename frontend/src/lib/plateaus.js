@@ -4,13 +4,7 @@
 import { isAssisted } from './exercises.js'
 import { modeOf, completedRepsOf } from './history.js'
 import { sessionsFor, stallCount, policyFor, DELOAD_AFTER } from './progression.js'
-import { metricDataOf } from './records.js'
-
-const rowMetric = (mode, row) =>
-  mode === 'cardio' ? (row.speed || 0)
-    : mode === 'distance' ? (row.m || 0)
-      : mode === 'time' ? (row.sec || 0)
-        : (row.w || 0)
+import { metricDataOf, rowMetric } from './records.js'
 
 // The first routine (in plan order) that trains this exercise with progression turned on for
 // it, i.e. the same policy nextPrescription would use for its next session.
@@ -48,17 +42,16 @@ function valueSeriesOf(workouts, exId) {
   return { mode, repsOnly, points }
 }
 
-// True when the personal best (or assisted low) was not set in the most recent session,
-// meaning no new personal record within this time window.
+// True when no consecutive pair within the last 4 points shows an improvement (per
+// higherIsBetter direction) - i.e. the trailing 4 sessions never beat the one right before them.
 function isFlatOverLast4(points, higherIsBetter) {
   if (points.length < 4) return false
-  let bestIndex = 0
-  let bestValue = points[0]
-  for (let i = 1; i < points.length; i++) {
-    const better = higherIsBetter ? points[i] > bestValue : points[i] < bestValue
-    if (better) { bestValue = points[i]; bestIndex = i }
+  const last4 = points.slice(-4)
+  for (let i = 1; i < last4.length; i++) {
+    const improved = higherIsBetter ? last4[i] > last4[i - 1] : last4[i] < last4[i - 1]
+    if (improved) return false
   }
-  return bestIndex < points.length - 1
+  return true
 }
 
 export function stalledExercises(S) {
