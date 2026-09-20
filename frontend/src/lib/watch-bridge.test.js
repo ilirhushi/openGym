@@ -1,6 +1,22 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { planPushPayload, decideWatchImport, isWatchSessionSeen, withWatchSessionSeen } from './watch-bridge.js'
 
+// Mock mobile.js to provide in-memory file storage and set MOBILE=true
+const fileStore = { data: null }
+vi.mock('./mobile.js', () => ({
+  MOBILE: true,
+  readJsonFile: async () => fileStore.data,
+  writeJsonFile: async (_n, d) => { fileStore.data = JSON.parse(JSON.stringify(d)) }
+}))
+
+// Mock the Capacitor plugin registration
+let capturedHandler = null
+vi.mock('@capacitor/core', () => ({
+  registerPlugin: () => ({
+    addListener: (_event, handler) => { capturedHandler = handler }
+  })
+}))
+
 describe('planPushPayload', () => {
   it('returns null off mobile (nothing to push, no plugin to call)', () => {
     expect(planPushPayload({ routines: [], dayPlan: {}, week: {}, workouts: [], exWeights: {}, unit: 'kg', active: null, customEx: [] }, '2026-09-22')).toBeNull()
@@ -44,5 +60,48 @@ describe('watch session idempotency', () => {
     expect(seen).toHaveLength(50)
     expect(isWatchSessionSeen(seen, 'w0')).toBe(false)
     expect(isWatchSessionSeen(seen, 'w59')).toBe(true)
+  })
+})
+
+describe('initWatchBridge redelivery gating', () => {
+  it('gates redelivery: onSession is called exactly once for duplicate watchSessionReceived events', async () => {
+    // Reset state
+    fileStore.data = null
+    capturedHandler = null
+
+    // Import initWatchBridge after mocks are in place
+    const { initWatchBridge } = await import('./watch-bridge.js')
+
+    const onSessionSpy = vi.fn()
+    await initWatchBridge(onSessionSpy)
+
+    // Verify the listener was registered
+    expect(capturedHandler).toBeDefined()
+
+    // Simulate the OS delivering the same watchSessionReceived event twice
+    const sameEvent = {
+      payload: JSON.stringify({
+        watchSessionId: 'w1',
+        date: '2026-09-21',
+        start: 0,
+        end: 1,
+        routineIds: [],
+        name: 'Push',
+        entries: []
+      })
+    }
+
+    // Fire the event twice (simulating redelivery)
+    await capturedHandler(sameEvent)
+    await capturedHandler(sameEvent)
+
+    // Verify onSession was called exactly once despite two events
+    expect(onSessionSpy).toHaveBeenCalledTimes(1)
+
+    // Verify the payload passed was the parsed JSON
+    expect(onSessionSpy).toHaveBeenCalledWith(expect.objectContaining({
+      watchSessionId: 'w1',
+      date: '2026-09-21'
+    }))
   })
 })
