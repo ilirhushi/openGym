@@ -6,12 +6,17 @@ import SwiftUI
 // by a (exerciseIndex, setIndex) cursor instead of a scrollable list of every set at once.
 struct SessionView: View {
     @State var session: WatchActiveSession
-    var onFinished: () -> Void = {}
 
     // The cursor. exerciseIndex also drives which TabView page is showing (it's the page
     // selection binding), setIndex is which set within that exercise's card is on screen.
-    @State private var exerciseIndex = 0
+    // It starts wherever the exercise list sent us rather than always at the first exercise.
+    @State private var exerciseIndex: Int
     @State private var setIndex = 0
+
+    init(session: WatchActiveSession, startIndex: Int = 0) {
+        _session = State(initialValue: session)
+        _exerciseIndex = State(initialValue: min(max(startIndex, 0), max(session.entries.count - 1, 0)))
+    }
 
     // Which value currently has Digital Crown focus. Only meaningful in reps mode (two
     // adjustable values); time mode has exactly one crown target and cardio mode has none.
@@ -29,16 +34,34 @@ struct SessionView: View {
     // something to invent here.
     private let restSeconds = 90
 
-    @State private var summary: WatchActiveSession?
-    @State private var summarySaved = false
-
     var body: some View {
         TabView(selection: $exerciseIndex) {
             ForEach(session.entries.indices, id: \.self) { i in
                 cardView(entryIndex: i).tag(i)
             }
         }
-        .tabViewStyle(.page)
+        // No page dots. They are drawn along the bottom edge, which is where the set rail lives,
+        // and with a seven-exercise session the two overlap into noise. Which exercise you are
+        // on is what the list behind the back button is for now.
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        // The name lives in a top safe-area inset rather than inside the page. A TabView page's
+        // content runs underneath the navigation bar, so on a real watch the name was drawn
+        // behind the back chevron; an inset is laid out clear of the bar by definition.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Text(currentEntry?.label ?? "")
+                .font(.caption)
+                .foregroundStyle(WatchPalette.dim)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                // Truncate the middle, not the tail. The library's longest names are
+                // distinguished by their endings, not their beginnings: "calf raise (tennis
+                // ball between ankles)" and "... between knees)" differ only in the last word,
+                // and tail truncation renders the two identical on screen.
+                .truncationMode(.middle)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 6)
+        }
         .onAppear {
             // Covers both a fresh Start and ContentView routing straight back into an
             // already-in-progress session after a relaunch: land on the first undone set rather
@@ -59,17 +82,10 @@ struct SessionView: View {
             restRunner?.cancel()
             restRunner = nil
         }
-        .fullScreenCover(item: $summary) { finished in
-            SummaryView(session: finished, saved: summarySaved) {
-                summary = nil
-                onFinished()
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Finish") { finish() }
-            }
-        }
+    }
+
+    private var currentEntry: WatchEntry? {
+        session.entries.indices.contains(exerciseIndex) ? session.entries[exerciseIndex] : nil
     }
 
     // MARK: - Card
@@ -88,29 +104,6 @@ struct SessionView: View {
             let j = min(setIndex, entry.sets.count - 1)
             let set = entry.sets[j]
             VStack(spacing: 6) {
-                // Phase and the countdown share a line. Vertical space is the scarcest thing on
-                // this screen and neither is worth a line of its own; the countdown is also only
-                // present some of the time, so giving it its own row would make the card jump.
-                // The name gets the whole row and up to two lines. Exercise names in the library
-                // are long and front-loaded with the equipment ("Dumbbell Incline Bench Press"),
-                // so a single elided line strands you on "Dumbbell ..." which identifies nothing.
-                // Nothing shares this row any more: the position indicator that used to sit here
-                // was costing the name roughly a third of the width to repeat what the rail at
-                // the bottom of the card already shows.
-                Text(entry.label)
-                    .font(.caption)
-                    .foregroundStyle(WatchPalette.dim)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
-                    // Truncate the middle, not the tail. The library's longest names are
-                    // distinguished by their endings, not their beginnings: "calf raise (tennis
-                    // ball between ankles)" and "... between knees)" differ only in the last
-                    // word, and tail truncation renders the two identical on screen. Keeping
-                    // both ends keeps the equipment and the qualifier that tells them apart.
-                    .truncationMode(.middle)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-
                 Spacer(minLength: 0)
                 valueBlock(entryIndex: i, setIndex: j, set: set)
 
@@ -134,11 +127,15 @@ struct SessionView: View {
                     // would describe the state while actually performing the opposite, so it
                     // becomes "Undo" instead.
                     Text(set.done ? "Undo" : "Done")
-                        .font(.body.weight(.semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(set.done ? Color.white : Color.black)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                // Small, not because the target should be hard to hit (full width keeps it an
+                // easy thumb target) but because at the default control size it was taller than
+                // the numeral and pulled the eye away from the thing you are here to read.
+                .controlSize(.small)
                 // White for the action you take dozens of times a session, so it stays the
                 // brightest thing under the numeral; a flat grey once logged, because an undo is
                 // a correction and should not compete for the eye.
@@ -339,26 +336,6 @@ struct SessionView: View {
         restRunner = runner
     }
 
-    private func finish() {
-        // Leaving the workout via Finish doesn't trigger onDisappear (the summary comes up in a
-        // fullScreenCover over this same view, not a pop), so the rest runner has to be torn
-        // down explicitly here too, same reasoning as onDisappear above: cancel, not skip.
-        restRunner?.cancel()
-        restRunner = nil
-        WatchSessionStore.shared.activeSession = session
-        guard let finished = WatchSessionStore.shared.finishSession() else { return }
-        summary = finished
-        summarySaved = false
-        // sendCompletedSession's completion reports whether the workout was handed to
-        // WCSession's durable outbox (not actual delivery to the phone, see that function's
-        // comment). Only clear the local copy once that handoff succeeds, so a failure (not yet
-        // activated, encode error) leaves the session persisted for
-        // WatchConnectivitySession.resendIfNeeded to retry instead of losing it.
-        WatchConnectivitySession.shared.sendCompletedSession(finished) { success in
-            summarySaved = success
-            if success { WatchSessionStore.shared.clearFinishedSession() }
-        }
-    }
 }
 
 // Black, white, one grey, one signal. The signal is reserved for "this is live or this is where
@@ -450,5 +427,115 @@ private struct SetRail: View {
     private func fill(_ k: Int) -> Color {
         if k == currentIndex { return WatchPalette.signal }
         return sets[k].done ? .white : WatchPalette.spent
+    }
+}
+
+
+// A pushed destination needs an Identifiable, and a bare Int is not one.
+private struct ExercisePick: Identifiable, Hashable { let id: Int }
+
+// The day's exercises in order, with how far each one has got. This is what the back button from
+// a set card returns to: mid-workout, "how many are left and what is next" should not require
+// swiping through every card to count. It also owns finishing, which is why the set card's
+// toolbar is now empty except for the back chevron, and why the exercise name finally has the
+// top of the screen to itself.
+struct SessionListView: View {
+    let session: WatchActiveSession
+    var onFinished: () -> Void = {}
+
+    @ObservedObject private var store = WatchSessionStore.shared
+    @State private var open: ExercisePick?
+    @State private var confirmingFinish = false
+    @State private var summary: WatchActiveSession?
+    @State private var summarySaved = false
+
+    // Progress is read back out of the store rather than from the value this view was built
+    // with. SessionView writes every set edit straight through, so returning from a card shows
+    // what was just logged instead of the snapshot taken when this list was first pushed.
+    private var live: WatchActiveSession { store.activeSession ?? session }
+
+    var body: some View {
+        List {
+            ForEach(live.entries.indices, id: \.self) { i in
+                Button { open = ExercisePick(id: i) } label: { row(i) }
+                    .buttonStyle(.plain)
+            }
+            // Finishing lives at the end of the list, past the exercises, so it is somewhere you
+            // arrive deliberately rather than something parked next to the controls you tap
+            // dozens of times a session.
+            Button("Finish workout") { confirmingFinish = true }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(WatchPalette.signal)
+        }
+        .navigationTitle("Today")
+        .navigationDestination(item: $open) { pick in
+            SessionView(session: live, startIndex: pick.id)
+        }
+        // Finishing cannot be undone from the wrist: it stamps the session ended and hands it to
+        // WCSession's outbox. The count in the message is the point of the confirmation, since
+        // stopping early with sets still unlogged is the mistake worth catching.
+        .confirmationDialog("Finish workout?", isPresented: $confirmingFinish, titleVisibility: .visible) {
+            Button("Save workout") { finish() }
+            Button("Keep going", role: .cancel) { }
+        } message: {
+            Text(progressLine)
+        }
+        .fullScreenCover(item: $summary) { finished in
+            SummaryView(session: finished, saved: summarySaved) {
+                summary = nil
+                onFinished()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ i: Int) -> some View {
+        let entry = live.entries[i]
+        let done = entry.sets.filter { $0.done }.count
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.label)
+                    .font(.caption)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .truncationMode(.middle)
+                Text("\(done)/\(entry.sets.count) sets")
+                    .font(.caption2)
+                    .foregroundStyle(WatchPalette.dim)
+            }
+            Spacer(minLength: 0)
+            if !entry.sets.isEmpty, done == entry.sets.count {
+                Image(systemName: "checkmark")
+                    .font(.caption2)
+                    .foregroundStyle(WatchPalette.signal)
+            }
+        }
+    }
+
+    private var progressLine: String {
+        let total = live.entries.reduce(0) { $0 + $1.sets.count }
+        let done = live.entries.reduce(0) { $0 + $1.sets.filter { $0.done }.count }
+        return done == total ? "All \(total) sets logged." : "\(done) of \(total) sets logged."
+    }
+
+    private func finish() {
+        // finishSession() works off the store's own copy and returns nil if there isn't one. If
+        // the store has been cleared out from under this view, fall back to the session it was
+        // built with, so Finish saves the workout rather than silently doing nothing.
+        if WatchSessionStore.shared.activeSession == nil {
+            WatchSessionStore.shared.activeSession = session
+        }
+        guard let finished = WatchSessionStore.shared.finishSession() else { return }
+        summary = finished
+        summarySaved = false
+        // sendCompletedSession's completion reports whether the workout was handed to WCSession's
+        // durable outbox (not actual delivery to the phone, see that function's comment). Only
+        // clear the local copy once that handoff succeeds, so a failure (not yet activated,
+        // encode error) leaves the session persisted for
+        // WatchConnectivitySession.resendIfNeeded to retry instead of losing it.
+        WatchConnectivitySession.shared.sendCompletedSession(finished) { success in
+            summarySaved = success
+            if success { WatchSessionStore.shared.clearFinishedSession() }
+        }
     }
 }
