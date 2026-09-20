@@ -16,6 +16,7 @@ import { strengthExerciseRowsForMuscle } from '../lib/strength-exercises.js'
 import { fatigueStateOf } from '../lib/recovery-view.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
 import { weeklyTrend } from '../lib/training-trend.js'
+import { personalRecords } from '../lib/records.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -314,6 +315,15 @@ export default function Stats() {
   const trendPrev4 = weekly.slice(-8, -4).map(pt => (trendView === 'vol' ? pt.vol : pt.count))
   const trendDelta = weekly.length >= 8 ? avgOf(trendLast4) - avgOf(trendPrev4) : null
   const monthW = workouts.filter(w => String(w.d || '').slice(0, 7) === todayISO().slice(0, 7)).length
+  const records = useMemo(() => personalRecords(S), [S])
+  const recordLabel = r => {
+    if (r.metric === 'weight') return fmtNum(r.value) + ' ' + S.unit
+    if (r.metric === 'e1rm') return t('Est. 1RM') + ' ' + fmtNum(r.value) + ' ' + S.unit
+    if (r.metric === 'reps') return fmtNum(r.value) + ' ' + t('reps')
+    if (r.metric === 'speed') return fmtNum(r.value) + ' km/h'
+    if (r.metric === 'distance') return fmtNum(metresToDisplay(r.value, S.unit)) + ' ' + distanceUnitLabel(S.unit)
+    return fmtNum(r.value) + ' s' // time
+  }
 
   const metricDataOf = (workout, id) => {
     const entries = metricEntriesForExercise(workout, id)
@@ -499,6 +509,17 @@ export default function Stats() {
         </div>}
       </> : <div className="muted small">{t('Not enough weeks of training yet.')}</div>}
     </div>}
+
+    <div className="card">
+      <h2>{t('Personal Records')}</h2>
+      {records.length ? <>
+        <div className="list">{records.slice(0, 10).map(r => <div key={r.id + '-' + r.metric} className="row between small" style={{ padding: '6px 0', borderBottom: 'var(--hair) solid var(--sep)' }}>
+          <span>{nameOf(r.id)}</span>
+          <span className="row" style={{ gap: 8 }}><b>{recordLabel(r)}</b><span className="muted">{fmtDate(r.date, true)}</span></span>
+        </div>)}</div>
+        {records.length > 10 && <div className="small dim" style={{ marginTop: 8 }}>{t('+{0} more', records.length - 10)}</div>}
+      </> : <div className="muted small">{t('No personal records yet.')}</div>}
+    </div>
 
     <div className="cols">
       <div className="card">
