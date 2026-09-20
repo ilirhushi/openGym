@@ -17,6 +17,7 @@ import { fatigueStateOf } from '../lib/recovery-view.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
 import { weeklyTrend } from '../lib/training-trend.js'
 import { personalRecords } from '../lib/records.js'
+import { stalledExercises } from '../lib/plateaus.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -324,6 +325,7 @@ export default function Stats() {
     if (r.metric === 'distance') return fmtNum(metresToDisplay(r.value, S.unit)) + ' ' + distanceUnitLabel(S.unit)
     return fmtNum(r.value) + ' s' // time
   }
+  const stalled = useMemo(() => stalledExercises(S), [S])
 
   const metricDataOf = (workout, id) => {
     const entries = metricEntriesForExercise(workout, id)
@@ -520,6 +522,14 @@ export default function Stats() {
         {records.length > 10 && <div className="small dim" style={{ marginTop: 8 }}>{t('+{0} more', records.length - 10)}</div>}
       </> : <div className="muted small">{t('No personal records yet.')}</div>}
     </div>
+
+    {stalled.length > 0 && <div className="card">
+      <h2>{t('Needs Attention')}</h2>
+      <div className="list">{stalled.map(f => <div key={f.id} className="mrow" style={{ cursor: 'pointer' }} {...tappable(() => setExId(f.id))}>
+        <span className="nm">{nameOf(f.id)}</span>
+        <span className="v dim small">{t(...f.reason)}</span>
+      </div>)}</div>
+    </div>}
 
     <div className="cols">
       <div className="card">
