@@ -166,8 +166,8 @@ struct SessionView: View {
                 .focused($crownFocus, equals: .seconds)
                 .digitalCrownRotation(
                     secBinding(entryIndex: i, setIndex: j),
-                    from: 0, through: 600, by: 5,
-                    sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+                    from: 0, through: 600, by: Self.secondsStep,
+                    sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
         } else if set.min != nil {
             // Cardio entries are read-only here too, same as the file this replaces: there's no
             // crown-adjustable field for them, just the logged duration and pace. The duration
@@ -188,8 +188,8 @@ struct SessionView: View {
                     .focused($crownFocus, equals: .weight)
                     .digitalCrownRotation(
                         weightBinding(entryIndex: i, setIndex: j),
-                        from: 0, through: 500, by: 2.5,
-                        sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+                        from: 0, through: 500, by: Self.weightStep,
+                        sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
                     .onTapGesture { crownFocus = .weight }
                 // No "reps" word: the multiplication sign already says what this number counts,
                 // and the two characters it costs are two characters of numeral size.
@@ -202,8 +202,8 @@ struct SessionView: View {
                     .focused($crownFocus, equals: .reps)
                     .digitalCrownRotation(
                         repsBinding(entryIndex: i, setIndex: j),
-                        from: 0, through: 50, by: 1,
-                        sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+                        from: 0, through: 50, by: Self.repsStep,
+                        sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
                     .onTapGesture { crownFocus = .reps }
             }
         }
@@ -276,22 +276,49 @@ struct SessionView: View {
 
     // MARK: - Crown bindings
 
+    // digitalCrownRotation's `by:` is the detent stride it uses for haptics and nothing more: it
+    // does NOT quantise what the binding is handed, which arrives as a continuous value. So the
+    // crown was writing 60.13 and the card rendered "60.1", a weight nobody loads and nobody can
+    // settle the crown on. Every setter below snaps to its own step, so the value written is
+    // always one you could actually put on a bar.
+    private static let weightStep = 2.5
+    private static let repsStep = 1.0
+    private static let secondsStep = 5.0
+
+    private static func snap(_ value: Double, to step: Double) -> Double {
+        (value / step).rounded() * step
+    }
+
     private func weightBinding(entryIndex i: Int, setIndex j: Int) -> Binding<Double> {
         Binding(
             get: { session.entries[i].sets[j].w ?? 0 },
-            set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.w = newValue } })
+            set: { newValue in
+                let snapped = Self.snap(newValue, to: Self.weightStep)
+                // Only write on a real change. The crown reports continuously, so without this
+                // every fractional wobble inside one detent would run the whole persist path.
+                guard snapped != session.entries[i].sets[j].w else { return }
+                updateSet(entryIndex: i, setIndex: j) { $0.w = snapped }
+            })
     }
 
     private func repsBinding(entryIndex i: Int, setIndex j: Int) -> Binding<Double> {
         Binding(
             get: { Double(session.entries[i].sets[j].r ?? 0) },
-            set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.r = Int(newValue.rounded()) } })
+            set: { newValue in
+                let snapped = Int(Self.snap(newValue, to: Self.repsStep))
+                guard snapped != session.entries[i].sets[j].r else { return }
+                updateSet(entryIndex: i, setIndex: j) { $0.r = snapped }
+            })
     }
 
     private func secBinding(entryIndex i: Int, setIndex j: Int) -> Binding<Double> {
         Binding(
             get: { session.entries[i].sets[j].sec ?? 0 },
-            set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.sec = newValue } })
+            set: { newValue in
+                let snapped = Self.snap(newValue, to: Self.secondsStep)
+                guard snapped != session.entries[i].sets[j].sec else { return }
+                updateSet(entryIndex: i, setIndex: j) { $0.sec = snapped }
+            })
     }
 
     // The one path every set edit (crown-driven weight/reps/seconds, the Done toggle) goes
