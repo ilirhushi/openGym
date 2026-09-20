@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { planPushPayload, decideWatchImport } from './watch-bridge.js'
+import { planPushPayload, decideWatchImport, isWatchSessionSeen, withWatchSessionSeen } from './watch-bridge.js'
 
 describe('planPushPayload', () => {
   it('returns null off mobile (nothing to push, no plugin to call)', () => {
@@ -27,5 +27,22 @@ describe('decideWatchImport', () => {
     expect(apply).not.toHaveBeenCalled()
     const [existing] = askUser.mock.calls[0]
     expect(existing.map(w => w.id)).toEqual(['old'])
+  })
+})
+
+describe('watch session idempotency', () => {
+  it('is not seen until recorded', () => {
+    expect(isWatchSessionSeen([], 'w1')).toBe(false)
+  })
+  it('is seen once recorded', () => {
+    const seen = withWatchSessionSeen([], 'w1')
+    expect(isWatchSessionSeen(seen, 'w1')).toBe(true)
+  })
+  it('keeps only the most recent 50 ids', () => {
+    let seen = []
+    for (let i = 0; i < 60; i++) seen = withWatchSessionSeen(seen, `w${i}`)
+    expect(seen).toHaveLength(50)
+    expect(isWatchSessionSeen(seen, 'w0')).toBe(false)
+    expect(isWatchSessionSeen(seen, 'w59')).toBe(true)
   })
 })

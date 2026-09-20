@@ -3,10 +3,23 @@
 // state in, returns plain data or calls the callbacks it's given, and never imports the store or
 // sheets.jsx directly (sheets.jsx's merge UI is wired in from useStore.js, Step 3b below, so
 // there's no import cycle between the store and the UI layer).
-import { MOBILE } from './mobile.js'
+import { MOBILE, readJsonFile, writeJsonFile } from './mobile.js'
 import { buildWatchPlanPayload } from './watch-sync.js'
 import { finishWatchSession } from './watch-import.js'
 import { workoutsOn } from './backfill.js'
+
+const SEEN_LIMIT = 50
+const SEEN_FILE = 'opengym-watch-seen.json'
+
+/** Has this Watch session id already been applied? Redelivery-safe (design doc §5.2). */
+export function isWatchSessionSeen(seenIds, watchSessionId) {
+  return seenIds.includes(watchSessionId)
+}
+
+/** Record a session id as applied, keeping only the most recent SEEN_LIMIT. */
+export function withWatchSessionSeen(seenIds, watchSessionId) {
+  return [...seenIds.filter(id => id !== watchSessionId), watchSessionId].slice(-SEEN_LIMIT)
+}
 
 /** Today's plan, or null when there's nothing to sync (off mobile, or no plan that day). */
 export function planPushPayload(S, iso) {
@@ -52,7 +65,13 @@ export function decideWatchImport(st, payload, { apply, askUser }) {
 export async function initWatchBridge(onSession) {
   const p = await plugin()
   if (!p) return
-  p.addListener('watchSessionReceived', ev => {
-    try { onSession(JSON.parse(ev.payload)) } catch (e) { /* malformed payload, drop it */ }
+  let seenIds = (await readJsonFile(SEEN_FILE)) || []
+  p.addListener('watchSessionReceived', async ev => {
+    let payload
+    try { payload = JSON.parse(ev.payload) } catch (e) { return }
+    if (!payload?.watchSessionId || isWatchSessionSeen(seenIds, payload.watchSessionId)) return
+    seenIds = withWatchSessionSeen(seenIds, payload.watchSessionId)
+    await writeJsonFile(SEEN_FILE, seenIds)
+    onSession(payload)
   })
 }
