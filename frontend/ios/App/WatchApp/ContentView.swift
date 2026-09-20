@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @ObservedObject var store = WatchSessionStore.shared
+    @ObservedObject private var store = WatchSessionStore.shared
     @State private var startedSession: WatchActiveSession?
 
     var body: some View {
@@ -22,7 +22,7 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(item: $startedSession) { session in
-                SessionView(session: session)
+                SessionView(session: session, onFinished: { startedSession = nil })
             }
         }
     }

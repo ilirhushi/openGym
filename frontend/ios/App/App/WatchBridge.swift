@@ -27,9 +27,14 @@ public class WatchBridge: CAPPlugin, WCSessionDelegate {
             call.resolve()
             return
         }
-        let payload = call.getString("payload")
+        // A rest day (or the plan-side finding nothing scheduled) sends payload: null. An
+        // Optional bridges to NSNull, which is not a property-list type and makes
+        // updateApplicationContext throw — so an empty context, not a null value, is how "no
+        // plan today" reaches the Watch. The Watch's own listener already treats a missing
+        // "payload" key as "clear the plan" (WatchConnectivitySession.swift).
+        let context: [String: Any] = call.getString("payload").map { ["payload": $0] } ?? [:]
         do {
-            try WCSession.default.updateApplicationContext(["payload": payload as Any])
+            try WCSession.default.updateApplicationContext(context)
             call.resolve()
         } catch {
             // No paired Watch, or the Watch app isn't installed — not an error the caller acts on.

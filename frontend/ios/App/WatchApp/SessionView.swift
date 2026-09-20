@@ -2,8 +2,11 @@ import SwiftUI
 
 struct SessionView: View {
     @State var session: WatchActiveSession
+    var onFinished: () -> Void = {}
     @State private var exerciseIndex = 0
     @State private var showRest = false
+    @State private var summary: WatchActiveSession?
+    @State private var summarySynced = false
 
     var body: some View {
         TabView(selection: $exerciseIndex) {
@@ -13,6 +16,12 @@ struct SessionView: View {
         }
         .tabViewStyle(.page)
         .sheet(isPresented: $showRest) { RestTimerView(seconds: 90) { showRest = false } }
+        .fullScreenCover(item: $summary) { finished in
+            SummaryView(session: finished, synced: summarySynced) {
+                summary = nil
+                onFinished()
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Finish") { finish() }
@@ -40,13 +49,13 @@ struct SessionView: View {
             if set.sec != nil {
                 Stepper("\(Int(set.sec ?? 0))s", value: Binding(
                     get: { session.entries[i].sets[j].sec ?? 0 },
-                    set: { session.entries[i].sets[j].sec = $0 }), in: 0...600, step: 5)
+                    set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.sec = newValue } }), in: 0...600, step: 5)
             } else if set.min != nil {
                 Text("\(Int(set.min ?? 0)) min @ \(String(format: "%.1f", set.speed ?? 0))")
             } else {
                 Stepper(value: Binding(
                     get: { session.entries[i].sets[j].w ?? 0 },
-                    set: { session.entries[i].sets[j].w = $0 }), in: 0...500, step: 2.5) {
+                    set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.w = newValue } }), in: 0...500, step: 2.5) {
                     Text("\(String(format: "%.1f", set.w ?? 0)) x \(set.r ?? 0)")
                 }
             }
@@ -59,10 +68,17 @@ struct SessionView: View {
         }
     }
 
-    private func toggleDone(entryIndex i: Int, setIndex j: Int) {
-        session.entries[i].sets[j].done.toggle()
+    // The one path every set edit (weight/duration steppers, the done toggle) goes through, so
+    // a crash or a back-swipe mid-session never loses an edit — design doc §7 asks this
+    // explicitly ("is any completed set lost?").
+    private func updateSet(entryIndex i: Int, setIndex j: Int, _ mutate: (inout WatchSet) -> Void) {
+        mutate(&session.entries[i].sets[j])
         WatchSessionStore.shared.activeSession = session
         WatchSessionStore.shared.persistActiveSession()
+    }
+
+    private func toggleDone(entryIndex i: Int, setIndex j: Int) {
+        updateSet(entryIndex: i, setIndex: j) { $0.done.toggle() }
         if session.entries[i].sets[j].done && session.entries[i].sets[j].phase == "work" {
             showRest = true
         }
@@ -71,7 +87,15 @@ struct SessionView: View {
     private func finish() {
         WatchSessionStore.shared.activeSession = session
         guard let finished = WatchSessionStore.shared.finishSession() else { return }
-        WatchConnectivitySession.shared.sendCompletedSession(finished)
-        WatchSessionStore.shared.clearFinishedSession()
+        // Show the summary immediately (optimistic — the transfer is already durably queued
+        // with the OS once sendCompletedSession's completion fires); only clear the local copy
+        // once that's confirmed, so a failure leaves the session persisted for retry
+        // (WatchConnectivitySession.resendIfNeeded) instead of losing it.
+        summary = finished
+        summarySynced = false
+        WatchConnectivitySession.shared.sendCompletedSession(finished) { success in
+            summarySynced = success
+            if success { WatchSessionStore.shared.clearFinishedSession() }
+        }
     }
 }
