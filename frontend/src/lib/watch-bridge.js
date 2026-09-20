@@ -60,6 +60,14 @@ export function decideWatchImport(st, payload, { apply, askUser }) {
   askUser(existing, replaceId => apply(finishWatchSession(st, payload, { replaceId })))
 }
 
+/** Watch-pairing status for Settings' "Apple Watch" row: null off mobile, on a non-iOS platform,
+ * or if the native call fails; otherwise { supported, paired, watchAppInstalled, reachable }. */
+export async function getWatchStatus() {
+  const p = await plugin()
+  if (!p) return null
+  try { return await p.getStatus() } catch (e) { return null }
+}
+
 /** Register the native listener for completed Watch sessions. `onSession(payload)` is called
  * once per incoming session (already JSON.parsed). No-op off mobile. */
 export async function initWatchBridge(onSession) {

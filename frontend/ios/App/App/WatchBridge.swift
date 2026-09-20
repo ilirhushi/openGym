@@ -11,6 +11,7 @@ import WatchConnectivity
  *   const WatchBridge = registerPlugin('WatchBridge');
  *   await WatchBridge.syncTodayPlan({ payload: JSON.stringify(planOrNull) });
  *   WatchBridge.addListener('watchSessionReceived', ({ payload }) => { ... });
+ *   const status = await WatchBridge.getStatus(); // { supported, paired, watchAppInstalled, reachable }
  */
 @objc(WatchBridge)
 public class WatchBridge: CAPPlugin, WCSessionDelegate {
@@ -40,6 +41,24 @@ public class WatchBridge: CAPPlugin, WCSessionDelegate {
             // No paired Watch, or the Watch app isn't installed — not an error the caller acts on.
             call.resolve()
         }
+    }
+
+    // For Settings → the Watch companion status row: whether this iPhone can talk to a Watch at
+    // all, whether one is paired, and whether the openGym Watch app is actually installed on it
+    // (it isn't distributed via any store — see docs/MOBILE.md — so "paired but not installed"
+    // is an expected, common state, not an error).
+    @objc func getStatus(_ call: CAPPluginCall) {
+        guard WCSession.isSupported() else {
+            call.resolve(["supported": false, "paired": false, "watchAppInstalled": false, "reachable": false])
+            return
+        }
+        let session = WCSession.default
+        call.resolve([
+            "supported": true,
+            "paired": session.isPaired,
+            "watchAppInstalled": session.isWatchAppInstalled,
+            "reachable": session.isReachable,
+        ])
     }
 
     // MARK: WCSessionDelegate
