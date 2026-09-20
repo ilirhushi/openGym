@@ -57,6 +57,30 @@ describe('buildWatchPlanPayload', () => {
     const { unit, ...noUnit } = S
     expect(buildWatchPlanPayload(noUnit, '2026-09-21').unit).toBe('kg')
   })
+  // The Watch ran a hardcoded 90s because the payload carried no rest at all, so every exercise
+  // rested the same and Settings' rest timer did nothing on the wrist.
+  it('carries the global rest timer on each entry', () => {
+    const payload = buildWatchPlanPayload({ ...S, restSec: 120 }, '2026-09-21')
+    expect(payload.entries[0].rest).toBe(120)
+  })
+  it("prefers an exercise's own restSec over the global one", () => {
+    const own = { ...routine, ex: [{ ...routine.ex[0], restSec: 240 }] }
+    const payload = buildWatchPlanPayload({ ...S, routines: [own], restSec: 90 }, '2026-09-21')
+    expect(payload.entries[0].rest).toBe(240)
+  })
+  // restSec 0 is the rest timer switched off (v1.2.11), not a missing value, and the Watch has
+  // to be able to tell those apart or it falls back to its own default and rests anyway.
+  it('carries a zero rest as zero, meaning the timer is off', () => {
+    const payload = buildWatchPlanPayload({ ...S, restSec: 0 }, '2026-09-21')
+    expect(payload.entries[0].rest).toBe(0)
+  })
+  it('carries warmupRest only when the exercise asks for its own', () => {
+    const plain = buildWatchPlanPayload(S, '2026-09-21')
+    expect(plain.entries[0].warmupRest).toBeUndefined()
+    const own = { ...routine, ex: [{ ...routine.ex[0], warmupRestSec: 30 }] }
+    const payload = buildWatchPlanPayload({ ...S, routines: [own] }, '2026-09-21')
+    expect(payload.entries[0].warmupRest).toBe(30)
+  })
   it('carries rid and noProg so a rehab routine stays excluded from progression when logged on the Watch', () => {
     const rehab = { id: 'r2', name: 'Rehab', excludeFromProgression: true, ex: [{ id: 'band-pull', sets: 1, reps: 15, weight: 0 }] }
     const combined = { ...S, routines: [routine, rehab], week: { 1: ['r1', 'r2'] } }

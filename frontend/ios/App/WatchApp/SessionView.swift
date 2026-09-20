@@ -29,10 +29,9 @@ struct SessionView: View {
     // thing that needs to trigger a re-render of SessionView itself.
     @State private var restRunner: RestTimerRunner?
 
-    // The synced plan carries no per-exercise rest interval yet (watch-sync.js's payload doesn't
-    // have that field). 90s is a placeholder until that's added; tracked as a follow-up, not
-    // something to invent here.
-    private let restSeconds = 90
+    // Only reached for a plan synced by a phone build that predates WatchEntry.rest. Matches the
+    // store's own default so an old plan rests the way it always did.
+    private let fallbackRestSeconds = 90
 
     var body: some View {
         // The name is a sibling of the TabView, not a modifier on it. safeAreaInset(edge: .top)
@@ -53,17 +52,40 @@ struct SessionView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
-            TabView(selection: $exerciseIndex) {
-                ForEach(session.entries.indices, id: \.self) { i in
-                    cardView(entryIndex: i).tag(i)
+            // No TabView. A TabView(.page) on watchOS is not confined to its slot in a stack:
+            // it takes the whole screen, runs under the navigation bar and past the bottom
+            // edge, and anything laid out beside it draws over the top. That one behaviour
+            // produced three separate bugs here, the exercise name painted across the weight, a
+            // Done button sliced in half by the bottom edge, and a clipped rest countdown. A
+            // plain stack plus a drag gesture does the same job with a layout that behaves.
+            if let entry = currentEntry, !entry.sets.isEmpty {
+                let j = min(setIndex, entry.sets.count - 1)
+                pageView(entry: entry, setIndex: j)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                doneButton(entry: entry, setIndex: j)
+                SetRail(sets: entry.sets, currentIndex: j) { k in
+                    // Tapping the rail is the way back to a set you already logged. Marking one
+                    // done advances the cursor, and without this there was no route back at all:
+                    // the Undo button only ever acts on the set currently showing.
+                    setIndex = k
+                    resetCrownFocus(entryIndex: exerciseIndex, setIndex: k)
                 }
+            } else {
+                Text("No sets").foregroundStyle(.secondary).frame(maxHeight: .infinity)
             }
-            // No page dots. They are drawn along the bottom edge, which is where the set rail
-            // lives, and with a seven-exercise session the two overlap into noise. Which
-            // exercise you are on is what the list behind the back button is for now.
-            .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .padding(.horizontal, 4)
+        // Swipe left or right for the next or previous exercise, the gesture the pager used to
+        // provide. A drag that starts at the very left edge is left alone: that belongs to
+        // watchOS's own swipe-to-go-back, and stealing it would trap you in the session.
+        .gesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard value.startLocation.x > 28 else { return }
+                    if value.translation.width < -24 { step(by: 1) }
+                    else if value.translation.width > 24 { step(by: -1) }
+                }
+        )
         .onAppear {
             // Covers both a fresh Start and ContentView routing straight back into an
             // already-in-progress session after a relaunch: land on the first undone set rather
@@ -92,82 +114,74 @@ struct SessionView: View {
 
     // MARK: - Card
 
+    private func step(by delta: Int) {
+        let next = exerciseIndex + delta
+        guard session.entries.indices.contains(next) else { return }
+        exerciseIndex = next
+    }
+
+    // The value, and whatever single line belongs under it.
     @ViewBuilder
-    private func cardView(entryIndex i: Int) -> some View {
-        let entry = session.entries[i]
-        if entry.sets.isEmpty {
-            Text("No sets").foregroundStyle(.secondary)
-        } else {
-            // TabView(.page) pre-renders the neighboring page or two for the swipe animation, so
-            // every page's body runs even when it isn't the one on screen. setIndex is only
-            // meaningful for the page that matches exerciseIndex; clamp it for any other page so
-            // an exercise with fewer sets than the current cursor's index never indexes out of
-            // bounds while it's momentarily rendered off-screen.
-            let j = min(setIndex, entry.sets.count - 1)
-            let set = entry.sets[j]
-            VStack(spacing: 6) {
-                Spacer(minLength: 0)
-                valueBlock(entryIndex: i, setIndex: j, set: set)
-
-                // Both of these are conditional, so this line costs nothing on an ordinary work
-                // set. A running countdown wins the slot: mid-rest it is the only thing changing
-                // and the thing you are actually waiting on.
-                if i == exerciseIndex, let restRunner {
-                    RestLine(runner: restRunner)
-                } else if set.phase == "warmup" {
-                    Text(positionLabel(entryIndex: i, setIndex: j))
-                        .font(.caption2)
-                        .foregroundStyle(WatchPalette.dim)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    toggleDone(entryIndex: i, setIndex: j)
-                } label: {
-                    // The button names what tapping it does. On a set already logged, "Done"
-                    // would describe the state while actually performing the opposite, so it
-                    // becomes "Undo" instead.
-                    Text(set.done ? "Undo" : "Done")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(set.done ? Color.white : Color.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 5)
-                        // White for the action you take dozens of times a session, so it stays
-                        // the brightest thing under the numeral; a flat grey once logged,
-                        // because an undo is a correction and should not compete for the eye.
-                        .background(Capsule().fill(set.done ? WatchPalette.spent : Color.white))
-                        // The pill is drawn short but sits inside a full-height tappable row.
-                        // watchOS keeps a 44pt minimum hit target and it is right to: this is
-                        // tapped mid-set with unsteady hands. Shrinking what is drawn while
-                        // leaving what is touched alone is how the button stops dominating the
-                        // card without becoming harder to hit.
-                        .frame(height: 44)
-                        .contentShape(Rectangle())
-                }
-                // Drawn rather than styled with .borderedProminent, whose own vertical padding
-                // neither .controlSize(.small) nor an outer .frame(height:) overrides.
-                .buttonStyle(.plain)
-
-                SetRail(sets: entry.sets, currentIndex: j) { k in
-                    // Tapping the rail is the way back to a set you already logged. Marking one
-                    // done advances the cursor, and without this there was no route back at all:
-                    // the Undo button only ever acts on the set already on screen.
-                    setIndex = k
-                    resetCrownFocus(entryIndex: i, setIndex: k)
-                }
+    private func pageView(entry: WatchEntry, setIndex j: Int) -> some View {
+        let set = entry.sets[j]
+        let runner = restRunner
+        VStack(spacing: 2) {
+            Spacer(minLength: 0)
+                // While a rest runs, the countdown is the thing you are actually watching and
+                // the set becomes a reminder of what is coming, so the two swap sizes. It also
+                // stops the timer being a detail you have to hunt for on a card whose largest
+                // element is a weight you are not lifting yet.
+            valueBlock(entryIndex: exerciseIndex, setIndex: j, set: set, compact: runner != nil)
+            if let runner {
+                RestHero(runner: runner)
+            } else if set.phase == "warmup" {
+                Text(positionLabel(entryIndex: exerciseIndex, setIndex: j))
+                    .font(.caption2)
+                    .foregroundStyle(WatchPalette.dim)
             }
-            .padding(.horizontal, 2)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 2)
+    }
+
+    private func doneButton(entry: WatchEntry, setIndex j: Int) -> some View {
+        let set = entry.sets[j]
+        return Button {
+            toggleDone(entryIndex: exerciseIndex, setIndex: j)
+        } label: {
+            // The button names what tapping it does. On a set already logged, "Done" would
+            // describe the state while actually performing the opposite, so it becomes "Undo".
+            Text(set.done ? "Undo" : "Done")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(set.done ? Color.white : Color.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                // White for the action you take dozens of times a session, so it stays the
+                // brightest thing under the numeral; a flat grey once logged, because an undo is
+                // a correction and should not compete for the eye.
+                .background(Capsule().fill(set.done ? WatchPalette.spent : Color.white))
+                // The pill is drawn short but sits inside a taller tappable row. watchOS keeps a
+                // 44pt minimum hit target and it is right to: this is tapped mid-set with
+                // unsteady hands. Shrinking what is drawn while leaving what is touched alone is
+                // how the button stops dominating the card without becoming harder to hit.
+                .frame(height: 40)
+                .contentShape(Rectangle())
+        }
+        // Drawn rather than styled with .borderedProminent, whose own vertical padding neither
+        // .controlSize(.small) nor an outer .frame(height:) overrides.
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func valueBlock(entryIndex i: Int, setIndex j: Int, set: WatchSet) -> some View {
+    // `compact` is the resting state: the set steps back to a reminder of what is coming while
+    // the countdown takes the size.
+    private func valueBlock(entryIndex i: Int, setIndex j: Int, set: WatchSet, compact: Bool) -> some View {
         // Same precedence as the file this replaces: sec first, then min, then reps. A set is
         // never more than one of these at once in practice, but if the payload ever did carry
         // more than one, time mode wins because it's the one the rest-timer flow cares about.
         if set.sec != nil {
-            numeral("\(Int(set.sec ?? 0))", unit: "sec", focused: crownFocus == .seconds)
+            numeral("\(Int(set.sec ?? 0))", unit: "sec", focused: crownFocus == .seconds,
+                    size: compact ? 20 : 42)
                 .focusable()
                 .focused($crownFocus, equals: .seconds)
                 .digitalCrownRotation(
@@ -180,7 +194,7 @@ struct SessionView: View {
             // still gets the full numeral treatment so the three modes read as one screen
             // rather than three, with the pace demoted to the context line it belongs on.
             VStack(spacing: 2) {
-                numeral("\(Int(set.min ?? 0))", unit: "min", focused: false)
+                numeral("\(Int(set.min ?? 0))", unit: "min", focused: false, size: compact ? 20 : 42)
                 Text("pace \(String(format: "%.1f", set.speed ?? 0))")
                     .font(.footnote)
                     .monospacedDigit()
@@ -193,7 +207,7 @@ struct SessionView: View {
             // the width, which is the trade: a shorter numeral, but one line instead of two.
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 numeral(trimmedWeight(set.w ?? 0), unit: session.unit ?? "kg",
-                        focused: crownFocus == .weight, size: 32)
+                        focused: crownFocus == .weight, size: compact ? 20 : 32)
                     .focusable()
                     .focused($crownFocus, equals: .weight)
                     .digitalCrownRotation(
@@ -204,7 +218,7 @@ struct SessionView: View {
                 // No "reps" word: the multiplication sign already says what this number counts,
                 // and on one line those characters are the width the weight needs.
                 Text("\u{00D7}\(set.r ?? 0)")
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: compact ? 16 : 24, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(WatchPalette.dim)
                     .lineLimit(1)
@@ -360,9 +374,11 @@ struct SessionView: View {
         // rest countdown or move the cursor forward, or undoing the set you're currently
         // reviewing would immediately fling you past it again.
         guard !wasDone else { return }
-        if session.entries[i].sets[j].phase == "work" {
-            startRest()
-        }
+        // Warm-up sets earn a rest too, the same as on the phone; they just tend to earn a
+        // shorter one. Previously only work sets started a countdown here, which quietly
+        // disagreed with warmupRestSecFor.
+        let seconds = restSeconds(entryIndex: i, setIndex: j)
+        if seconds > 0 { startRest(seconds: seconds) }
         advanceCursor(entryIndex: i, setIndex: j)
     }
 
@@ -382,13 +398,26 @@ struct SessionView: View {
         // is the only way forward from here.
     }
 
-    private func startRest() {
+    // The phone's warmupRestSecFor rule, applied here because only the Watch knows which set was
+    // just finished and what is left after it: a ramp set rests the exercise's warmupRest, but
+    // the LAST ramp set, the one leading into the first work set, rests the full work rest.
+    // Zero comes back when the rest timer is off, and the caller does not start a countdown.
+    private func restSeconds(entryIndex i: Int, setIndex j: Int) -> Int {
+        let entry = session.entries[i]
+        let work = entry.rest ?? fallbackRestSeconds
+        guard entry.sets[j].phase == "warmup", let warmup = entry.warmupRest else { return work }
+        let next = entry.sets[(j + 1)...].first(where: { !$0.done })
+        guard let next, next.phase == "warmup" else { return work }
+        return warmup
+    }
+
+    private func startRest(seconds: Int) {
         // Starting a new rest while one is already running (e.g. the previous set's rest hadn't
         // finished when this one was marked done) must not leak the old Timer or extended
         // runtime session. cancel(), not skip(): this isn't the old countdown completing, so it
         // must not fire its success haptic or onDone a second time.
         restRunner?.cancel()
-        let runner = RestTimerRunner(seconds: restSeconds)
+        let runner = RestTimerRunner(seconds: seconds)
         runner.onDone = { restRunner = nil }
         runner.start()
         restRunner = runner
@@ -433,31 +462,31 @@ private extension View {
 
 // Small subview so only this piece re-renders on the countdown's per-second tick, via its own
 // @ObservedObject subscription to RestTimerRunner.remaining, instead of the whole card.
-private struct RestLine: View {
+private struct RestHero: View {
     @ObservedObject var runner: RestTimerRunner
 
     var body: some View {
         Button {
-            // skip() (not cancel()) here: tapping the rest line is the user choosing to end the
-            // rest early, which is the countdown finishing early, not this screen going away. It
-            // fires the same success haptic and onDone as running out the clock would.
+            // skip() (not cancel()) here: tapping is the user choosing to end the rest early,
+            // which is the countdown finishing early, not this screen going away. It fires the
+            // same success haptic and onDone as running out the clock would.
             runner.skip()
         } label: {
-            // Named, not just a number. Unlabelled, a lone "1:23" counting down under a set is
-            // unreadable: it could be elapsed time, a target, anything. The word is what makes it
-            // a rest timer. Drawn inside a bordered capsule for the same reason, so that it reads
-            // as something you can tap (to skip) rather than a status line.
-            HStack(spacing: 4) {
+            VStack(spacing: -2) {
+                // Named, not just a number. A lone countdown under a set could be elapsed time,
+                // a target, anything; the word is what makes it a rest timer.
                 Text("rest")
-                Text(formatted).monospacedDigit()
+                    .font(.system(size: 12, weight: .semibold))
+                Text(formatted)
+                    .font(.system(size: 38, weight: .heavy))
+                    .monospacedDigit()
             }
-            .font(.system(size: 15, weight: .semibold))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 3)
-            .overlay(Capsule().stroke(WatchPalette.signal.opacity(0.55), lineWidth: 1))
+            .foregroundStyle(WatchPalette.signal)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(WatchPalette.signal)
     }
 
     // Monospaced because this number changes every second in place. With proportional digits the

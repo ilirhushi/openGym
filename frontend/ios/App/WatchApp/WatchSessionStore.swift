@@ -24,6 +24,15 @@ struct WatchEntry: Codable, Identifiable, Hashable {
     // entry came from; whether it's excluded from progression) instead of losing them.
     var rid: String?
     var noProg: Bool?
+    // Seconds of rest after a set of this exercise, resolved on the phone by the same restSecFor
+    // the session screen uses (Settings' rest timer, or the exercise's own restSec overriding
+    // it). Zero is meaningful: it is the rest timer switched off, not a missing value. Optional
+    // only so a plan persisted by a build without the field still decodes.
+    var rest: Int?
+    // Rest between ramp sets, when the exercise asks for its own. The break after the LAST ramp
+    // set, into the first work set, is `rest`, because that is the rest the first heavy set
+    // needs. See warmupRestSecFor in supersetFlow.js, whose rule SessionView applies.
+    var warmupRest: Int?
 }
 
 struct WatchPlan: Codable {
