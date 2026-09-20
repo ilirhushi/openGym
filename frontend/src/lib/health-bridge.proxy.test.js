@@ -7,6 +7,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 vi.mock('./mobile.js', () => ({
   MOBILE: true,
+  isIOS: async () => true,
   readJsonFile: async () => null,
   writeJsonFile: async () => {},
 }))

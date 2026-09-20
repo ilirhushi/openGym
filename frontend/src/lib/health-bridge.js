@@ -1,7 +1,7 @@
 // Transport for the Apple Health integration: the native plugin plus the device-local record of
 // how the last write went. Every decision lives in lib/health.js instead, so this file has no
 // branching beyond "is there a plugin at all".
-import { MOBILE, readJsonFile, writeJsonFile } from './mobile.js'
+import { MOBILE, isIOS, readJsonFile, writeJsonFile } from './mobile.js'
 
 const STATUS_FILE = 'opengym-health-status.json'
 
@@ -15,12 +15,23 @@ const STATUS_FILE = 'opengym-health-status.json'
 //
 // This applies to an `async function`'s return value too, not only an explicit .then(), hence a
 // plain function rather than an async one.
+//
+// The iOS check lives here rather than at the call sites. Platform availability is a property of
+// this transport, not a training decision, so it must not go into health.js; and doFinishWorkout
+// is synchronous by contract (spec section 7) while isIOS() is async, so a guard at that call
+// site would force the finish path async. Off iOS there is no plugin, and every function below
+// already has a "no plugin" answer, so the feature simply no-ops. This matters because S.health
+// is an ordinary synced store key: an Android device signed into the same account reads the
+// toggle as on, and without this guard would attempt a write on every finish and record a
+// failure in a status line only an iPhone can render.
 let pluginPromise = null
 function plugin() {
   if (!MOBILE) return Promise.resolve({ p: null })
   if (!pluginPromise) {
-    pluginPromise = import('@capacitor/core')
-      .then(({ registerPlugin }) => ({ p: registerPlugin('Health') }))
+    pluginPromise = isIOS()
+      .then(ok => ok
+        ? import('@capacitor/core').then(({ registerPlugin }) => ({ p: registerPlugin('Health') }))
+        : { p: null })
       .catch(e => { console.error('Health plugin unavailable:', e); return { p: null } })
   }
   return pluginPromise

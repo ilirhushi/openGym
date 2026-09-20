@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   shouldWriteWorkout, workoutHealthType, healthWorkoutPayload,
-  bodyWeightPrefill, HEALTH_BW_MAX_AGE_MS,
+  bodyWeightPrefill, shouldPhoneWriteWatchWorkout, HEALTH_BW_MAX_AGE_MS,
 } from './health.js'
 
 const workout = (over = {}) => ({
@@ -102,5 +102,31 @@ describe('bodyWeightPrefill', () => {
   })
   it('rejects a reading dated in the future beyond clock tolerance', () => {
     expect(bodyWeightPrefill({ kg: 82, at: now + 10 * 60 * 1000 }, { now })).toBeNull()
+  })
+})
+
+// The routing rule applied to the raw Watch sync-back payload. These rows exist because the
+// field path is the part that can rot: `payload.health?.saved` against `payload?.health?.saved`,
+// or a rename on the Swift side, would otherwise route every Watch session wrong with nothing
+// failing (spec section 5.2).
+describe('shouldPhoneWriteWatchWorkout', () => {
+  it('writes when the payload carries no health key at all: the Watch never saved one', () => {
+    expect(shouldPhoneWriteWatchWorkout({ watchSessionId: 'w1' }, true)).toBe(true)
+  })
+  it('does not write when the Watch already saved the record', () => {
+    expect(shouldPhoneWriteWatchWorkout({ health: { saved: true, avgHr: 142 } }, true)).toBe(false)
+  })
+  it('writes when the Watch ran sensors but failed to save', () => {
+    expect(shouldPhoneWriteWatchWorkout({ health: { saved: false, avgHr: 142 } }, true)).toBe(true)
+  })
+  // Same answer as an absent key, which is the safe direction: one record rather than none.
+  it('treats a missing payload as "no health key" instead of throwing', () => {
+    expect(shouldPhoneWriteWatchWorkout(null, true)).toBe(true)
+    expect(shouldPhoneWriteWatchWorkout(undefined, true)).toBe(true)
+  })
+  it('never writes with the toggle off, whatever the payload says', () => {
+    expect(shouldPhoneWriteWatchWorkout({ watchSessionId: 'w1' }, false)).toBe(false)
+    expect(shouldPhoneWriteWatchWorkout({ health: { saved: false } }, false)).toBe(false)
+    expect(shouldPhoneWriteWatchWorkout(null, false)).toBe(false)
   })
 })

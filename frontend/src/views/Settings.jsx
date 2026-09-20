@@ -4,7 +4,7 @@ import { useStore, DEF, hasData } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { convertStateUnit } from '../lib/units.js'
 import { useUI } from '../store/useUI.js'
-import { ACCENTS, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate, fmtNum, fmtDate } from '../lib/format.js'
+import { ACCENTS, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate, fmtNum, fmtDate, isoOf } from '../lib/format.js'
 import { inventoryFor } from '../lib/plates.js'
 import { formatFtIn, clampHeightInches, inToCm } from '../lib/bodyfat.js'
 import { effortOf } from '../lib/history.js'
@@ -309,9 +309,13 @@ export default function Settings() {
           update(s => { s.health = true })
         }} />
       </Row>
+      {/* isoOf, not toISOString(): the rest of the app dates things locally, and a write that
+          failed at 23:30 in UTC+2 would otherwise be reported as having failed tomorrow. The
+          `at` guard is belt and braces: a status file without it would throw here and take the
+          whole Settings screen down over a cosmetic line. */}
       {S.health && healthStatus && healthStatus.ok === false && (
         <Row icon="clock" iconTint="var(--orange)" title={t('Last write failed')}
-          subtitle={fmtDate(new Date(healthStatus.at).toISOString().slice(0, 10), true)} />
+          subtitle={Number.isFinite(healthStatus.at) ? fmtDate(isoOf(new Date(healthStatus.at)), true) : ''} />
       )}
     </Section>}
 

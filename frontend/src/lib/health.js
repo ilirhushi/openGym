@@ -15,6 +15,10 @@ export const HEALTH_BW_MAX_AGE_MS = 36 * 60 * 60 * 1000
 // disagree by seconds routinely. Beyond this the timestamp is not trustworthy enough to use.
 const CLOCK_SKEW_MS = 5 * 60 * 1000
 
+// `!= null` rather than truthiness on purpose: a zero-minute or zero-speed row is still a cardio
+// row, and treating it as strength would flip the type of a whole session on one empty field.
+// This is deliberately the same discriminator, spelled the same way, as the ones in
+// watch-sync.js and workout-model.js. Keep the three identical.
 const isCardioSet = s => !!s && (s.min != null || s.speed != null)
 
 /**
@@ -23,6 +27,15 @@ const isCardioSet = s => !!s && (s.min != null || s.speed != null)
  * `past` is a backfilled session, `fromWatch` a session logged on the Apple Watch, and
  * `healthSaved` whether that Watch already saved the HKWorkout itself. The invariant across all
  * of it is exactly one health record per session, never zero and never two (spec section 5.2).
+ */
+/*
+ * On the write sites (spec section 8, spec section 3.4): only `past` is enforced here, because
+ * only backfill reaches this function at all. The other three sites that spec section 3.4 rules
+ * out, session-edit.js, CSV/Hevy import and demo seeding, are blocked structurally: none of them
+ * imports health-bridge.js, so none of them has a way to write to Health even if it wanted to.
+ * That is a stronger guarantee than a flag check, and an invisible one: a refactor that "just
+ * reuses the finish hook" for any of those three would silently undo it, with no test failing,
+ * because the guarantee lives in the import graph rather than in this signature.
  */
 export function shouldWriteWorkout({ enabled = false, past = false, fromWatch = false, healthSaved = false } = {}) {
   if (!enabled) return false
@@ -73,4 +86,20 @@ export function bodyWeightPrefill(read, { now = Date.now(), maxAgeMs = HEALTH_BW
   if (now - read.at > maxAgeMs) return null
   if (read.at - now > CLOCK_SKEW_MS) return null
   return kg
+}
+
+/**
+ * Should the phone write the health record for an incoming Apple Watch session?
+ *
+ * The routing rule is "an absent `health` key means the Watch could not save it, so the phone
+ * must" (spec section 5.2), and that rule reads a field off the raw sync-back payload. It lives
+ * here rather than inline at the import site so a typo in the path, or a later rename of the
+ * field, fails a test instead of silently routing every Watch session to zero records or two.
+ */
+export function shouldPhoneWriteWatchWorkout(payload, enabled = false) {
+  return shouldWriteWorkout({
+    enabled,
+    fromWatch: true,
+    healthSaved: payload?.health?.saved === true,
+  })
 }
