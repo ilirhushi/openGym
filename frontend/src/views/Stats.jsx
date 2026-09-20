@@ -15,6 +15,7 @@ import { fatigueOf, strengthOf, STRENGTH_FLOOR, LB_TO_KG } from '../lib/recovery
 import { strengthExerciseRowsForMuscle } from '../lib/strength-exercises.js'
 import { fatigueStateOf } from '../lib/recovery-view.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
+import { weeklyTrend } from '../lib/training-trend.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -302,6 +303,16 @@ export default function Stats() {
   const bw30 = S.bodyweight.filter(b => (b.t || new Date(b.d).getTime()) > now - 30 * 86400000)
   const bwDelta30 = bw30.length > 1 ? bw30[bw30.length - 1].w - bw30[0].w : null
   const workouts = S.workouts
+  const [trendView, setTrendView] = useState('vol')
+  const [trendRange, setTrendRange] = useState(90)
+  const trendWeeks = trendRange === 0 ? 0 : Math.ceil(trendRange / 7)
+  const weekly = useMemo(() => weeklyTrend(workouts, trendWeeks, weekStartOf(S), now),
+    [workouts, trendWeeks, S.weekStart, now])
+  const trendPts = weekly.map(pt => ({ t: pt.t, y: trendView === 'vol' ? pt.vol : pt.count }))
+  const avgOf = arr => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null)
+  const trendLast4 = weekly.slice(-4).map(pt => (trendView === 'vol' ? pt.vol : pt.count))
+  const trendPrev4 = weekly.slice(-8, -4).map(pt => (trendView === 'vol' ? pt.vol : pt.count))
+  const trendDelta = weekly.length >= 8 ? avgOf(trendLast4) - avgOf(trendPrev4) : null
   const monthW = workouts.filter(w => String(w.d || '').slice(0, 7) === todayISO().slice(0, 7)).length
 
   const metricDataOf = (workout, id) => {
@@ -471,6 +482,23 @@ export default function Stats() {
 
     {workouts.length > 0 && <MuscleBalance S={S} />}
     {hasEffort(S) && <EffortCard S={S} />}
+
+    {workouts.length > 0 && <div className="card">
+      <h2>{t('Training Volume')}</h2>
+      <Segmented className="seg-range" value={trendView} onChange={setTrendView}
+        options={[{ value: 'vol', label: t('Volume') }, { value: 'freq', label: t('Frequency') }]} />
+      <Segmented className="seg-range" value={trendRange} onChange={setTrendRange}
+        options={[{ value: 30, label: '1M' }, { value: 90, label: '3M' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
+      {weekly.length >= 2 ? <>
+        <div className="chart"><LineChart points={trendPts} h={150} unit={trendView === 'vol' ? S.unit : t('workouts')} color="var(--blue)" /></div>
+        {trendDelta != null && <div className="small dim" style={{ marginTop: 8 }}>
+          {t('Last 4 weeks vs. the 4 before:')}{' '}
+          <b style={{ color: trendDelta === 0 ? 'inherit' : trendDelta > 0 ? 'var(--acc)' : 'var(--red)' }}>
+            {trendDelta > 0 ? '+' : ''}{trendView === 'vol' ? fmtVol(trendDelta, S.unit) : fmtNum(trendDelta)}
+          </b>
+        </div>}
+      </> : <div className="muted small">{t('Not enough weeks of training yet.')}</div>}
+    </div>}
 
     <div className="cols">
       <div className="card">
