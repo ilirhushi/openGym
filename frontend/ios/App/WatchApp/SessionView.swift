@@ -35,21 +35,13 @@ struct SessionView: View {
     private let restSeconds = 90
 
     var body: some View {
-        TabView(selection: $exerciseIndex) {
-            ForEach(session.entries.indices, id: \.self) { i in
-                cardView(entryIndex: i).tag(i)
-            }
-        }
-        // No page dots. They are drawn along the bottom edge, which is where the set rail lives,
-        // and with a seven-exercise session the two overlap into noise. Which exercise you are
-        // on is what the list behind the back button is for now.
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        // The name lives in a top safe-area inset rather than inside the page. A TabView page's
-        // content runs underneath the navigation bar, so on a real watch the name was drawn
-        // behind the back chevron; an inset is laid out clear of the bar by definition.
-        .safeAreaInset(edge: .top, spacing: 0) {
+        // The name is a sibling of the TabView, not a modifier on it. safeAreaInset(edge: .top)
+        // did not reserve any height against a paged TabView on watchOS: it simply drew the name
+        // over the top of the page, straight across the weight. A VStack is the only arrangement
+        // here that actually gives the two their own space.
+        VStack(spacing: 2) {
             Text(currentEntry?.label ?? "")
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(WatchPalette.dim)
                 .lineLimit(2)
                 .minimumScaleFactor(0.75)
@@ -60,8 +52,18 @@ struct SessionView: View {
                 .truncationMode(.middle)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 6)
+
+            TabView(selection: $exerciseIndex) {
+                ForEach(session.entries.indices, id: \.self) { i in
+                    cardView(entryIndex: i).tag(i)
+                }
+            }
+            // No page dots. They are drawn along the bottom edge, which is where the set rail
+            // lives, and with a seven-exercise session the two overlap into noise. Which
+            // exercise you are on is what the list behind the back button is for now.
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
+        .padding(.horizontal, 4)
         .onAppear {
             // Covers both a fresh Start and ContentView routing straight back into an
             // already-in-progress session after a relaunch: land on the first undone set rather
@@ -130,27 +132,26 @@ struct SessionView: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(set.done ? Color.white : Color.black)
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        // White for the action you take dozens of times a session, so it stays
+                        // the brightest thing under the numeral; a flat grey once logged,
+                        // because an undo is a correction and should not compete for the eye.
+                        .background(Capsule().fill(set.done ? WatchPalette.spent : Color.white))
+                        // The pill is drawn short but sits inside a full-height tappable row.
+                        // watchOS keeps a 44pt minimum hit target and it is right to: this is
+                        // tapped mid-set with unsteady hands. Shrinking what is drawn while
+                        // leaving what is touched alone is how the button stops dominating the
+                        // card without becoming harder to hit.
+                        .frame(height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderedProminent)
-                // Small, not because the target should be hard to hit (full width keeps it an
-                // easy thumb target) but because at the default control size it was taller than
-                // the numeral and pulled the eye away from the thing you are here to read.
-                .controlSize(.small)
-                // White for the action you take dozens of times a session, so it stays the
-                // brightest thing under the numeral; a flat grey once logged, because an undo is
-                // a correction and should not compete for the eye.
-                .tint(set.done ? WatchPalette.spent : .white)
+                // Drawn rather than styled with .borderedProminent, whose own vertical padding
+                // neither .controlSize(.small) nor an outer .frame(height:) overrides.
+                .buttonStyle(.plain)
 
                 SetRail(sets: entry.sets, currentIndex: j)
             }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 2)
-            // A TabView page's content area runs under the toolbar strip, and this VStack
-            // centres itself in it, so a name that wraps to a second line grows upward and the
-            // first line disappears behind the clock and Finish. Keeping the card inside the
-            // safe area is what stops that.
-            .padding(.top, 4)
-            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, 2)
         }
     }
 
@@ -181,7 +182,7 @@ struct SessionView: View {
             }
         } else {
             VStack(spacing: 2) {
-                numeral(String(format: "%.1f", set.w ?? 0), unit: session.unit ?? "kg",
+                numeral(trimmedWeight(set.w ?? 0), unit: session.unit ?? "kg",
                         focused: crownFocus == .weight)
                     .focusable()
                     .focused($crownFocus, equals: .weight)
@@ -206,6 +207,13 @@ struct SessionView: View {
                     .onTapGesture { crownFocus = .reps }
             }
         }
+    }
+
+    // A whole weight reads as "40", not "40.0". The tenth only means something on a plate-loaded
+    // lift when it is actually there (72.5), and carrying it the rest of the time costs a
+    // character of the largest text on the screen for no information.
+    private func trimmedWeight(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
     }
 
     // The number is the only thing worth reading at arm's length mid-set, so it takes the whole
@@ -456,6 +464,24 @@ struct SessionListView: View {
 
     var body: some View {
         List {
+            // How long you have been training, and since when. A workout's length is the one
+            // thing about the session that the exercises themselves cannot tell you, and it is
+            // what you check when deciding whether to add a set or wrap up.
+            VStack(alignment: .leading, spacing: 0) {
+                // A TimelineView rather than a Timer: it only asks for a redraw while this
+                // screen is actually on, so an elapsed clock does not keep the app awake in a
+                // pocket between sets.
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(elapsedText(at: context.date))
+                        .font(.system(size: 26, weight: .semibold))
+                        .monospacedDigit()
+                }
+                Text("started \(startedText)")
+                    .font(.caption2)
+                    .foregroundStyle(WatchPalette.dim)
+            }
+            .listRowBackground(Color.clear)
+
             ForEach(live.entries.indices, id: \.self) { i in
                 Button { open = ExercisePick(id: i) } label: { row(i) }
                     .buttonStyle(.plain)
@@ -510,6 +536,24 @@ struct SessionListView: View {
                     .foregroundStyle(WatchPalette.signal)
             }
         }
+    }
+
+    // WatchActiveSession.start is epoch milliseconds, matching the phone's own timestamps.
+    private var startedDate: Date { Date(timeIntervalSince1970: live.start / 1000) }
+
+    private var startedText: String {
+        startedDate.formatted(date: .omitted, time: .shortened)
+    }
+
+    // m:ss for an ordinary session, h:mm:ss once past the hour. Clamped at zero because a
+    // session started on the phone carries the phone's clock, and the two devices do not have
+    // to agree to the second.
+    private func elapsedText(at now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(startedDate)))
+        let h = seconds / 3600, m = (seconds % 3600) / 60, s = seconds % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%d:%02d", m, s)
     }
 
     private var progressLine: String {
