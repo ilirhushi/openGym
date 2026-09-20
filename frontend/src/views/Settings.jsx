@@ -8,7 +8,7 @@ import { ACCENTS, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate, fmtN
 import { inventoryFor } from '../lib/plates.js'
 import { formatFtIn, clampHeightInches, inToCm } from '../lib/bodyfat.js'
 import { effortOf } from '../lib/history.js'
-import { unlock, playOnSilentSupported } from '../lib/sound.js'
+import { beep, setVolume, unlock, playOnSilentSupported, VOLUMES } from '../lib/sound.js'
 import { api, webauthnOK, passkeyLogin, passkeyRegister, IS_ANDROID } from '../lib/api.js'
 import { pushSupported, enablePush, disablePush, sendTestPush, syncPushSubscription } from '../lib/push.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
@@ -349,8 +349,13 @@ export default function Settings() {
       </Row>
       <Row icon="bell" iconTint="var(--pink)" title={t('Sounds')}>
         {/* Turning Sounds on is a tap: unlock the audio context now so a timer that ends before
-            the next set check can already sound (iOS, #152). */}
-        <Switch checked={!!S.sound} onChange={v => { if (v) unlock(true); update(s => { s.sound = v }) }} />
+            the next set check can already sound (iOS, #152). A timer already running had
+            its countdown queued when it started, so it is re-queued (or called off) here too. */}
+        <Switch checked={!!S.sound} onChange={v => {
+          if (v) unlock(true)
+          update(s => { s.sound = v })
+          useUI.getState().restartCountdown()
+        }} />
       </Row>
       {/* iOS only (WebKit's audio-session API, iOS 17+): with it off the ring/silent switch mutes
           the timer. On, the phone treats the timer like a music player — exclusive, and the
@@ -359,6 +364,22 @@ export default function Settings() {
         <Row icon="bell" iconTint="var(--orange)" title={t('Play sounds when the phone is on silent')}
           subtitle={t('Music playing on this phone stops during a workout and does not resume by itself.')}>
           <Switch checked={!!S.soundOnSilent} onChange={v => update(s => { s.soundOnSilent = v })} />
+        </Row>
+      )}
+      {/* How loud all of it is. A tone plays on every tap — a volume you cannot hear while you
+          are choosing it is not a choice — and a timer that is already counting picks the new
+          level up straight away (lib/sound.js, store/useUI.js restartCountdown). */}
+      {S.sound && (
+        <Row icon="bell" iconTint="var(--pink)" title={t('Sound volume')}
+          subtitle={t('Loudest also means highest. Your phone’s own volume is the master — press volume up while a rest is counting down, when the buttons control the timer rather than the ringer.')}>
+          <Segmented className="seg-inline"
+            options={[{ value: 'low', label: t('Low') }, { value: 'medium', label: t('Medium') }, { value: 'loud', label: t('Loud') }]}
+            value={VOLUMES[S.soundVol] ? S.soundVol : 'loud'}
+            onChange={v => {
+              update(s => { s.soundVol = v })
+              unlock(true); setVolume(v); beep(true, 880, 0.15)
+              useUI.getState().restartCountdown()
+            }} />
         </Row>
       )}
       <Row icon="sun" iconTint="var(--yellow)" title={t('Flash screen when timer ends')}>
