@@ -16,6 +16,7 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		51B4D3F299A65F9CE86847AD /* WatchApp Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 522DD6A461ADBC59B131EC90 /* WatchApp Watch App.app */; };
+		6EFCD9E05786ED118E5807D7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B4A39606ECB0C0AACF3A1E9 /* Assets.xcassets */; };
 		836AFB19C2DB3B65BA429690 /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 855F6ADB8A7855600D3E47C5 /* RestTimerView.swift */; };
 		948D63B896AE6851FFA09278 /* WatchAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7BB35E3A0528F95D72759F9 /* WatchAppApp.swift */; };
 		9C58DC2295488E3FBC6A76EB /* WatchBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 31C7E06E3375EB5E230A505E /* WatchBridge.m */; };
@@ -66,8 +67,9 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
-		522DD6A461ADBC59B131EC90 /* WatchApp Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WatchApp Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		522DD6A461ADBC59B131EC90 /* WatchApp Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "WatchApp Watch App.app"; path = WatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		711B5638CA8C240E02A694CE /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		7B4A39606ECB0C0AACF3A1E9 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		855F6ADB8A7855600D3E47C5 /* RestTimerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RestTimerView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		AA0100000000000000000001 /* PrintPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrintPlugin.swift; sourceTree = "<group>"; };
@@ -169,8 +171,8 @@
 				BE48E20D13353303233CCECA /* WatchConnectivitySession.swift */,
 				EBAD9104F1F458DC37623C9F /* SessionView.swift */,
 				855F6ADB8A7855600D3E47C5 /* RestTimerView.swift */,
+				7B4A39606ECB0C0AACF3A1E9 /* Assets.xcassets */,
 			);
-			name = WatchApp;
 			path = WatchApp;
 			sourceTree = "<group>";
 		};
@@ -237,6 +239,9 @@
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
 					};
+					B29566FDF8EBC269EB66FAA2 = {
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -276,6 +281,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6EFCD9E05786ED118E5807D7 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
