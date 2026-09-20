@@ -39,6 +39,7 @@ export async function isIOS() {
     const { Capacitor } = await import('@capacitor/core')
     return Capacitor.getPlatform() === 'ios'
   } catch (e) {
+    console.error('isIOS() failed:', e)
     return false
   }
 }

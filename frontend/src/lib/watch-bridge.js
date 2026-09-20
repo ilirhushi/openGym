@@ -33,7 +33,7 @@ async function plugin() {
   if (!pluginPromise) {
     pluginPromise = import('@capacitor/core')
       .then(({ registerPlugin }) => registerPlugin('WatchBridge'))
-      .catch(() => null)
+      .catch(e => { console.error('WatchBridge plugin unavailable:', e); return null })
   }
   return pluginPromise
 }
@@ -72,7 +72,7 @@ export function decideWatchImport(getState, payload, { apply, askUser }) {
 export async function getWatchStatus() {
   const p = await plugin()
   if (!p) return null
-  try { return await p.getStatus() } catch (e) { return null }
+  try { return await p.getStatus() } catch (e) { console.error('WatchBridge.getStatus failed:', e); return null }
 }
 
 /** Register the native listener for completed Watch sessions. `onSession(payload, markSeen)` is
