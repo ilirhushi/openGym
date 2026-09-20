@@ -707,6 +707,7 @@ export const useStore = create((set, get) => {
             else { get().setUser(remote.user); setSync({ offline: true }) }   // offline — keep going from the last-synced local copy
           }
           syncReminder(get().S)
+          syncTodayPlanToWatch(get().S)
           finishBoot()
           return
         }
@@ -719,6 +720,13 @@ export const useStore = create((set, get) => {
         }
         get().setGuest(true)
         syncReminder(get().S)
+        // A cold launch is the one moment the Watch can't learn the plan any other way: the only
+        // other pushes are nativePersist's (which needs the state to actually change) and
+        // onAppActive's (Capacitor's appStateChange fires on a background->foreground
+        // transition, never on first launch). Without this, a freshly-installed or freshly-
+        // restarted phone leaves the Watch on "Not synced yet" until you happen to edit
+        // something or background the app.
+        syncTodayPlanToWatch(get().S)
         // Only a genuinely first launch — nothing chosen yet and nothing to lose either — offers
         // the choice. Picking local (even with no data yet) persists that choice below and this
         // never asks again.
