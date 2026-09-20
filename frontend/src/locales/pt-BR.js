@@ -701,6 +701,9 @@ export const PT_BR_OVERRIDES = {
   'Last time came up short — same distance again inside the cap.': 'Da última vez faltou — mesma distância no limite.',
   'Keep timing after target': 'Continuar contando após o objetivo',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'As séries cronometradas continuam por até 15 minutos extras. Toque em Concluído para registrar a duração real.',
+  'Save as routine?': 'Salvar como rotina?',
+  'Save as routine': 'Salvar como rotina',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': 'Criar uma rotina independente a partir destes objetivos. O histórico de treinos será mantido.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

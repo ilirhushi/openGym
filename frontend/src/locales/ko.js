@@ -1283,4 +1283,7 @@ export default {
   'Last time came up short — same distance again inside the cap.': '지난번 미달 — 제한 안에 같은 거리 다시.',
   'Keep timing after target': '목표 시간 후에도 계속 측정',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': '시간 제한 세트는 최대 15분 추가로 계속됩니다. 실제 시간을 기록하려면 완료를 누르세요.',
+  'Save as routine?': '루틴으로 저장할까요?',
+  'Save as routine': '루틴으로 저장',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': '이 운동 목표로 독립 루틴을 만듭니다. 운동 기록은 그대로 유지됩니다.',
 }

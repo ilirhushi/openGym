@@ -1283,4 +1283,7 @@ export default {
   'Last time came up short — same distance again inside the cap.': '上次没完成——时限内仍是同一距离。',
   'Keep timing after target': '达到目标后继续计时',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': '计时组最多继续 15 分钟。点击“完成”记录实际时长。',
+  'Save as routine?': '要保存为训练计划吗？',
+  'Save as routine': '保存为训练计划',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': '根据这些训练目标创建独立训练计划。你的训练记录会保留。',
 }

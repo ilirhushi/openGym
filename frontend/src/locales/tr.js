@@ -1283,4 +1283,7 @@ export default {
   'Last time came up short — same distance again inside the cap.': 'Geçen sefer yetmedi — süre içinde aynı mesafe.',
   'Keep timing after target': 'Hedeften sonra zamanlamayı sürdür',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Süreli setler en fazla 15 dakika daha devam eder. Gerçek süreyi kaydetmek için Bitti’ye dokunun.',
+  'Save as routine?': 'Rutin olarak kaydedilsin mi?',
+  'Save as routine': 'Rutin olarak kaydet',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': 'Bu egzersiz hedeflerinden bağımsız bir rutin oluştur. Antrenman geçmişin korunur.',
 }

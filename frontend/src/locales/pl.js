@@ -1283,4 +1283,7 @@ export default {
   'Last time came up short — same distance again inside the cap.': 'Ostatnio za mało — ten sam dystans w limicie.',
   'Keep timing after target': 'Kontynuuj pomiar po czasie docelowym',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Serie na czas trwają do 15 dodatkowych minut. Stuknij Gotowe, aby zapisać rzeczywisty czas.',
+  'Save as routine?': 'Zapisać jako rutynę?',
+  'Save as routine': 'Zapisz jako rutynę',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': 'Utwórz niezależną rutynę z tych celów ćwiczeń. Historia treningów pozostanie bez zmian.',
 }

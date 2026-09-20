@@ -1283,4 +1283,7 @@ export default {
   'Last time came up short — same distance again inside the cap.': 'Pas assez la dernière fois — même distance dans le temps imparti.',
   'Keep timing after target': 'Continuer après l’objectif',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Les séries chronométrées continuent jusqu’à 15 minutes supplémentaires. Touchez « Terminé » pour enregistrer la durée réelle.',
+  'Save as routine?': 'Enregistrer comme routine ?',
+  'Save as routine': 'Enregistrer comme routine',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': 'Créer une routine indépendante à partir de ces objectifs. Votre historique reste conservé.',
 }

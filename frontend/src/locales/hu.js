@@ -1286,4 +1286,7 @@ export default {
   'Step (m)': 'Lépés (m)',
   'Keep timing after target': 'Időzítés folytatása a cél után',
   'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Az időzített sorozatok legfeljebb 15 extra percig folytatódnak. A tényleges idő rögzítéséhez koppints a Kész gombra.',
+  'Save as routine?': 'Mentés rutinként?',
+  'Save as routine': 'Mentés rutinként',
+  'Create an independent routine from these exercise targets. Your workout history is kept.': 'Független rutin létrehozása ezekből a célokból. Az edzéstörténeted megmarad.',
 }
