@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2245990C018FB07FE6D65C53 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA4471015B6F93E03A26BA6 /* MainViewController.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4E2EF7E1DC05D25BB155A09A /* WatchConnectivitySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE48E20D13353303233CCECA /* WatchConnectivitySession.swift */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -68,6 +69,7 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		522DD6A461ADBC59B131EC90 /* WatchApp Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "WatchApp Watch App.app"; path = WatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6BA4471015B6F93E03A26BA6 /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		711B5638CA8C240E02A694CE /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		72AC0A2BEC30DC1533AF700E /* SummaryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SummaryView.swift; sourceTree = "<group>"; };
 		7B4A39606ECB0C0AACF3A1E9 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 				EDD9FDA4380885F679DCC0D0 /* WatchBridge.swift */,
 				31C7E06E3375EB5E230A505E /* WatchBridge.m */,
+				6BA4471015B6F93E03A26BA6 /* MainViewController.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -325,6 +328,7 @@
 				AA0100000000000000000004 /* PrintPlugin.m in Sources */,
 				C89EAB92AD8EA31A276C8474 /* WatchBridge.swift in Sources */,
 				9C58DC2295488E3FBC6A76EB /* WatchBridge.m in Sources */,
+				2245990C018FB07FE6D65C53 /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
