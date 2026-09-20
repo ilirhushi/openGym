@@ -50,6 +50,11 @@ vi.mock('../lib/mobile.js', () => ({
 vi.mock('../lib/watch-bridge.js', () => ({
   getWatchStatus: () => Promise.resolve(mocks.watchStatus),
 }))
+vi.mock('../lib/health-bridge.js', () => ({
+  requestHealthPermissions: () => Promise.resolve(null),
+  getHealthAuth: () => Promise.resolve(null),
+  readHealthStatus: () => Promise.resolve(null),
+}))
 vi.mock('../lib/update.js', () => ({ checkForUpdate: vi.fn(() => Promise.resolve(null)), downloadAndInstall: vi.fn() }))
 vi.mock('./MobileOnboarding.jsx', () => ({ ConnectSheet: () => null }))
 vi.mock('../sheets.jsx', () => ({

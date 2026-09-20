@@ -31,6 +31,8 @@ import { jp3BodyFatPct, jp3SitesFor, navyCircKeysFor, navyBodyFatPct, clampBodyF
 import { normalizeRepRange } from './lib/rep-range.js'
 import { MOBILE, shareExport, printHtml } from './lib/mobile.js'
 import { buildCompletedWorkout } from './lib/finish-workout.js'
+import { shouldWriteWorkout, healthWorkoutPayload } from './lib/health.js'
+import { saveHealthWorkout } from './lib/health-bridge.js'
 import { isWarmupRow, hasCompletedWork } from './lib/workout-model.js'
 import { saveSessionAsRoutine } from './lib/session-routines.js'
 import { nextUnfinishedUnit } from './lib/supersetFlow.js'
@@ -2705,6 +2707,13 @@ function doFinishWorkout() {
     s.active = null
   })
   useStore.getState().autoBackupNow()
+  // Apple Health, live finishes only. `past` is the backfill discriminator, so a workout logged
+  // into the past never rewrites the user's Health history (spec section 3.4). Fire-and-forget on
+  // purpose: doFinishWorkout must not become async, must not wait on HealthKit, and a failed
+  // health write must never surface an error over the finish summary. The workout is already in
+  // openGym's own history by this line, so nothing is lost if the write fails.
+  const hd = shouldWriteWorkout({ enabled: st.health === true, past }) ? healthWorkoutPayload(w) : null
+  if (hd) saveHealthWorkout(hd)
   // Nothing of the finished workout may keep counting: a hold that outlived it would log its
   // set into whatever is active next.
   useUI.getState().stopWork()
@@ -2735,6 +2744,15 @@ export function handleIncomingWatchSession(payload, markSeen) {
       update(s => { s.workouts = workouts; s.exWeights = exWeights })
       useStore.getState().autoBackupNow()
       markSeen()
+      // The Watch normally saves its own HKWorkout, because only the side that ran the session
+      // can attach its heart-rate samples. When it could not (no authorization on the Watch, or
+      // the save failed), the phone is the only side left that can write it, sensor-less. This
+      // is what keeps the invariant at exactly one health record per session, never zero
+      // (spec section 5.2).
+      const hd = shouldWriteWorkout({
+        enabled: S().health === true, fromWatch: true, healthSaved: payload.health?.saved === true,
+      }) ? healthWorkoutPayload(w) : null
+      if (hd) saveHealthWorkout(hd)
       ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
     },
     askUser: (existing, choose) => {

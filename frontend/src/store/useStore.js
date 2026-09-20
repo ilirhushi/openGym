@@ -31,6 +31,10 @@ export const DEF = {
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   // Stats activity heatmap metric. Profiles without this key continue to open on time.
   heatmapMetric: 'time',
+  // Apple Health sync, off until the user turns it on in Settings (iOS mobile build only).
+  // Read at finish time, never captured at workout start, so turning it off mid-session takes
+  // effect immediately. Health data itself never leaves the device and never reaches the server.
+  health: false,
   // How the active workout is laid out — 'cards' (one exercise at a time with Prev/Next),
   // 'list' (every exercise stacked and scrollable) or 'compact' (that stack stripped to just
   // names and set rows — no media, tags, notes, last-time or progression line). Purely
