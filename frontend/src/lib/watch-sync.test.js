@@ -46,6 +46,17 @@ describe('buildWatchPlanPayload', () => {
     const payload = buildWatchPlanPayload({ ...S, active: { id: 'a1' } }, '2026-09-21')
     expect(payload.activeOnPhone).toBe(true)
   })
+  // The Watch shows a weight next to a unit and has no other source for it: the payload is the
+  // only thing that crosses. Without this it either prints a bare number or, worse, labels a
+  // pound lifter's sets "kg".
+  it('carries the unit so the Watch can label a weight', () => {
+    expect(buildWatchPlanPayload(S, '2026-09-21').unit).toBe('kg')
+    expect(buildWatchPlanPayload({ ...S, unit: 'lb' }, '2026-09-21').unit).toBe('lb')
+  })
+  it('falls back to kg when state carries no unit', () => {
+    const { unit, ...noUnit } = S
+    expect(buildWatchPlanPayload(noUnit, '2026-09-21').unit).toBe('kg')
+  })
   it('carries rid and noProg so a rehab routine stays excluded from progression when logged on the Watch', () => {
     const rehab = { id: 'r2', name: 'Rehab', excludeFromProgression: true, ex: [{ id: 'band-pull', sets: 1, reps: 15, weight: 0 }] }
     const combined = { ...S, routines: [routine, rehab], week: { 1: ['r1', 'r2'] } }
