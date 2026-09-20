@@ -181,9 +181,13 @@ struct SessionView: View {
                     .foregroundStyle(WatchPalette.dim)
             }
         } else {
-            VStack(spacing: 2) {
+            // Weight and reps read as one statement, "57.5 kg x 9", because that is how a set is
+            // said out loud and how it is written in a log. Stacked, the eye had to make two
+            // stops to read one fact. The pair is sized down from the single-value modes to fit
+            // the width, which is the trade: a shorter numeral, but one line instead of two.
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 numeral(trimmedWeight(set.w ?? 0), unit: session.unit ?? "kg",
-                        focused: crownFocus == .weight)
+                        focused: crownFocus == .weight, size: 32)
                     .focusable()
                     .focused($crownFocus, equals: .weight)
                     .digitalCrownRotation(
@@ -192,11 +196,12 @@ struct SessionView: View {
                         sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
                     .onTapGesture { crownFocus = .weight }
                 // No "reps" word: the multiplication sign already says what this number counts,
-                // and the two characters it costs are two characters of numeral size.
-                Text("\u{00D7} \(set.r ?? 0)")
-                    .font(.system(size: 20, weight: .semibold))
+                // and on one line those characters are the width the weight needs.
+                Text("\u{00D7}\(set.r ?? 0)")
+                    .font(.system(size: 24, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(WatchPalette.dim)
+                    .lineLimit(1)
                     .focusRule(crownFocus == .reps)
                     .focusable()
                     .focused($crownFocus, equals: .reps)
@@ -206,6 +211,7 @@ struct SessionView: View {
                         sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
                     .onTapGesture { crownFocus = .reps }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -220,13 +226,15 @@ struct SessionView: View {
     // visual budget in every mode. Monospaced digits matter more here than anywhere else on the
     // screen: without them the value reflows on every crown detent, and a number that shifts
     // while you turn it is harder to read than one half its size that stays put.
-    private func numeral(_ value: String, unit: String, focused: Bool) -> some View {
+    // `size` drops for the reps mode, where the weight shares its line with the rep count; the
+    // single-value modes keep the full height since they have the width to themselves.
+    private func numeral(_ value: String, unit: String, focused: Bool, size: CGFloat = 42) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             Text(value)
-                .font(.system(size: 42, weight: .heavy))
+                .font(.system(size: size, weight: .heavy))
                 .monospacedDigit()
             Text(unit)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: max(11, size * 0.33), weight: .semibold))
                 .foregroundStyle(WatchPalette.dim)
         }
         .lineLimit(1)
