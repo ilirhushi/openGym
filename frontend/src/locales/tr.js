@@ -1279,4 +1279,6 @@ export default {
   'Covered the distance in every set — go for {0} this time.': 'Her sette mesafe tamam — bu sefer {0}.',
   'Fell short {0} sessions in a row — back off to {1} and build up again.': '{0} seans üst üste eksik — {1}e inip yeniden çık.',
   'Last time came up short — same distance again inside the cap.': 'Geçen sefer yetmedi — süre içinde aynı mesafe.',
+  'Keep timing after target': 'Hedeften sonra zamanlamayı sürdür',
+  'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Süreli setler en fazla 15 dakika daha devam eder. Gerçek süreyi kaydetmek için Bitti’ye dokunun.',
 }

@@ -1279,4 +1279,6 @@ export default {
   'Covered the distance in every set — go for {0} this time.': 'Distancia cubierta en cada serie — esta vez {0}.',
   'Fell short {0} sessions in a row — back off to {1} and build up again.': 'Fallaste {0} sesiones seguidas — baja a {1} y vuelve a subir.',
   'Last time came up short — same distance again inside the cap.': 'La última vez te faltó — misma distancia dentro del límite.',
+  'Keep timing after target': 'Seguir contando después del objetivo',
+  'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Las series cronometradas continúan hasta 15 minutos extra. Toca «Listo» para registrar la duración real.',
 }

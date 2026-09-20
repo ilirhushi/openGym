@@ -1279,4 +1279,6 @@ export default {
   'Covered the distance in every set — go for {0} this time.': '모든 세트에서 거리 달성 — 이번엔 {0}.',
   'Fell short {0} sessions in a row — back off to {1} and build up again.': '{0}회 연속 미달 — {1}(으)로 낮추고 다시 올리세요.',
   'Last time came up short — same distance again inside the cap.': '지난번 미달 — 제한 안에 같은 거리 다시.',
+  'Keep timing after target': '목표 시간 후에도 계속 측정',
+  'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': '시간 제한 세트는 최대 15분 추가로 계속됩니다. 실제 시간을 기록하려면 완료를 누르세요.',
 }

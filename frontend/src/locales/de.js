@@ -1299,4 +1299,6 @@ export default {
   'Covered the distance in every set — go for {0} this time.': 'Distanz in jeder Serie geschafft — diesmal {0}.',
   'Fell short {0} sessions in a row — back off to {1} and build up again.': '{0} Einheiten in Folge verfehlt — zurück auf {1} und neu aufbauen.',
   'Last time came up short — same distance again inside the cap.': 'Letztes Mal nicht geschafft — dieselbe Distanz im Zeitlimit.',
+  'Keep timing after target': 'Nach dem Ziel weiterzählen',
+  'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Zeitbasierte Sätze laufen bis zu 15 zusätzliche Minuten weiter. Tippe auf „Fertig“, um die tatsächliche Dauer zu speichern.',
 }

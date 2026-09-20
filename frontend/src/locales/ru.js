@@ -1279,4 +1279,6 @@ export default {
   'Covered the distance in every set — go for {0} this time.': 'Дистанция в каждом подходе — в этот раз {0}.',
   'Fell short {0} sessions in a row — back off to {1} and build up again.': 'Не хватило {0} тренировок подряд — назад к {1} и снова вверх.',
   'Last time came up short — same distance again inside the cap.': 'В прошлый раз не хватило — та же дистанция в лимите.',
+  'Keep timing after target': 'Продолжать отсчёт после цели',
+  'Timed sets continue up to 15 extra minutes. Tap Done to log the actual duration.': 'Подходы на время продолжаются ещё до 15 минут. Нажмите «Готово», чтобы записать фактическую длительность.',
 }
