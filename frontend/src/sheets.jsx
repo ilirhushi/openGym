@@ -30,9 +30,10 @@ import { nextPrescription, applyPrescription, policyFor, defaultIncrement, POLIC
 import { jp3BodyFatPct, jp3SitesFor, navyCircKeysFor, navyBodyFatPct, clampBodyFatPct, lengthUnitFor, bodyFatMethodLabel, clampHeightInches } from './lib/bodyfat.js'
 import { normalizeRepRange } from './lib/rep-range.js'
 import { MOBILE, shareExport, printHtml } from './lib/mobile.js'
+import { convertWeight } from './lib/units.js'
 import { buildCompletedWorkout } from './lib/finish-workout.js'
-import { shouldWriteWorkout, healthWorkoutPayload } from './lib/health.js'
-import { saveHealthWorkout } from './lib/health-bridge.js'
+import { shouldWriteWorkout, healthWorkoutPayload, bodyWeightPrefill } from './lib/health.js'
+import { saveHealthWorkout, readLatestBodyWeight } from './lib/health-bridge.js'
 import { isWarmupRow, hasCompletedWork } from './lib/workout-model.js'
 import { saveSessionAsRoutine } from './lib/session-routines.js'
 import { nextUnfinishedUnit } from './lib/supersetFlow.js'
@@ -211,6 +212,22 @@ function BwSheet({ required, onDone, close }) {
   const unit = st.unit
   const bw = lastBW(st)
   const [v, setV] = useState(bw ? bw.w : 70)
+  // Apple Health prefill: a scale reading from this morning beats last session's number. This
+  // only ever moves the slider, it never writes anything. The user still confirms, and openGym
+  // logs its own entry, so training data is never mutated without them seeing it (spec 3.6).
+  useEffect(() => {
+    if (!MOBILE || st.health !== true) return
+    // Already weighed in today by hand: their own number wins over the scale's.
+    if (st.bodyweight.some(b => b.d === todayISO())) return
+    let cancelled = false
+    readLatestBodyWeight().then(r => {
+      if (cancelled) return
+      const kg = bodyWeightPrefill(r)
+      if (kg == null) return
+      setV(convertWeight(kg, 'kg', unit))
+    })
+    return () => { cancelled = true }
+  }, [])
   const save = () => {
     const n = Math.round((v || 0) * 10) / 10
     if (!n || n <= 0) { toast(t('Enter a valid weight')); return }
