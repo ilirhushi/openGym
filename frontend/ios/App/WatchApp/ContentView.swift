@@ -25,8 +25,11 @@ struct ContentView: View {
                     }.padding()
                 }
             }
+            // Into the day's exercise list, not straight onto a set card: the list is the spine
+            // of the session (order, progress, finishing) and a card's back button has to have
+            // somewhere useful to land.
             .navigationDestination(item: $startedSession) { session in
-                SessionView(session: session, onFinished: { startedSession = nil })
+                SessionListView(session: session, onFinished: { startedSession = nil })
             }
         }
     }
