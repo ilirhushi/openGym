@@ -39,7 +39,6 @@ struct WatchActiveSession: Codable, Identifiable, Hashable {
     var routineIds: [String]
     var name: String?
     var entries: [WatchEntry]
-    var synced: Bool = false
 }
 
 final class WatchSessionStore: ObservableObject {

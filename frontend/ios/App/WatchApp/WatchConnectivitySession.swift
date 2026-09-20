@@ -15,8 +15,14 @@ final class WatchConnectivitySession: NSObject, WCSessionDelegate, ObservableObj
         WCSession.default.activate()
     }
 
+    // WatchConnectivity invokes delegate methods on its own private queue, not main — every
+    // other handler in this file already hops to main before touching WatchSessionStore's
+    // @Published properties; resendIfNeeded (and sendCompletedSession's now-synchronous
+    // completion, since round 2 dropped the didFinish hop that used to cover this) needs the
+    // same hop, or a background publish to ContentView's @ObservedObject is a real crash risk.
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if activationState == .activated { resendIfNeeded() }
+        guard activationState == .activated else { return }
+        DispatchQueue.main.async { [weak self] in self?.resendIfNeeded() }
     }
 
     // Latest today's-plan payload from the phone (WCSession's own latest-value-wins semantics —
@@ -56,6 +62,7 @@ final class WatchConnectivitySession: NSObject, WCSessionDelegate, ObservableObj
     func sendCompletedSession(_ session: WatchActiveSession, completion: @escaping (Bool) -> Void) {
         guard let data = try? JSONEncoder().encode(session),
               let payloadString = String(data: data, encoding: .utf8) else {
+            log.error("failed to encode a finished Watch session — it stays persisted, but every resendIfNeeded retry will fail the same way")
             completion(false)
             return
         }

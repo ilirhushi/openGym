@@ -19,6 +19,11 @@ final class RestTimerRunner: NSObject, ObservableObject, WKExtendedRuntimeSessio
     }
 
     func start() {
+        // SwiftUI can re-fire onAppear on a still-live view; gating on the timer (never on the
+        // extended session, which start() always attempts regardless of the countdown's state)
+        // stops a second call installing a second Timer — that would double the tick rate and
+        // orphan the first extended runtime session's reference.
+        guard timer == nil else { return }
         beginCountdown()
         let s = WKExtendedRuntimeSession()
         s.delegate = self
