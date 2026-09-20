@@ -33,7 +33,8 @@ export const DEF = {
   heatmapMetric: 'time',
   // Apple Health sync, off until the user turns it on in Settings (iOS mobile build only).
   // Read at finish time, never captured at workout start, so turning it off mid-session takes
-  // effect immediately. Health data itself never leaves the device and never reaches the server.
+  // effect immediately. Nothing is sent to any third party and openGym never phones home; the
+  // hr summary rides on the workout record, so it syncs to your own server along with it.
   health: false,
   // How the active workout is laid out — 'cards' (one exercise at a time with Prev/Next),
   // 'list' (every exercise stacked and scrollable) or 'compact' (that stack stripped to just
