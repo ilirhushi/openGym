@@ -149,7 +149,13 @@ struct SessionView: View {
                 // neither .controlSize(.small) nor an outer .frame(height:) overrides.
                 .buttonStyle(.plain)
 
-                SetRail(sets: entry.sets, currentIndex: j)
+                SetRail(sets: entry.sets, currentIndex: j) { k in
+                    // Tapping the rail is the way back to a set you already logged. Marking one
+                    // done advances the cursor, and without this there was no route back at all:
+                    // the Undo button only ever acts on the set already on screen.
+                    setIndex = k
+                    resetCrownFocus(entryIndex: i, setIndex: k)
+                }
             }
             .padding(.horizontal, 2)
         }
@@ -437,15 +443,26 @@ private struct RestLine: View {
             // fires the same success haptic and onDone as running out the clock would.
             runner.skip()
         } label: {
-            // Monospaced because this number changes every second in place. With proportional
-            // digits the whole line shifts as the width of the glyphs changes, and a countdown
-            // that twitches is the most distracting thing that can be on a watch face.
-            Text(formatted).monospacedDigit()
+            // Named, not just a number. Unlabelled, a lone "1:23" counting down under a set is
+            // unreadable: it could be elapsed time, a target, anything. The word is what makes it
+            // a rest timer. Drawn inside a bordered capsule for the same reason, so that it reads
+            // as something you can tap (to skip) rather than a status line.
+            HStack(spacing: 4) {
+                Text("rest")
+                Text(formatted).monospacedDigit()
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3)
+            .overlay(Capsule().stroke(WatchPalette.signal.opacity(0.55), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .foregroundStyle(WatchPalette.signal)
     }
 
+    // Monospaced because this number changes every second in place. With proportional digits the
+    // whole line shifts as the width of the glyphs changes, and a countdown that twitches is the
+    // most distracting thing that can be on a watch face.
     private var formatted: String {
         String(format: "%d:%02d", runner.remaining / 60, runner.remaining % 60)
     }
@@ -459,18 +476,28 @@ private struct RestLine: View {
 private struct SetRail: View {
     let sets: [WatchSet]
     let currentIndex: Int
+    var onSelect: (Int) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(sets.indices, id: \.self) { k in
-                Capsule()
-                    .fill(fill(k))
-                    .frame(width: sets[k].phase == "warmup" ? 14 : nil)
-                    .frame(maxWidth: sets[k].phase == "warmup" ? 14 : .infinity)
-                    .frame(height: k == currentIndex ? 5 : 3)
+                Button { onSelect(k) } label: {
+                    Capsule()
+                        .fill(fill(k))
+                        .frame(width: sets[k].phase == "warmup" ? 14 : nil)
+                        .frame(maxWidth: sets[k].phase == "warmup" ? 14 : .infinity)
+                        .frame(height: k == currentIndex ? 5 : 3)
+                        // The touch area is far taller than the bar it draws. The rail doubles
+                        // as the only way back to a set you have already logged, and a 3pt-high
+                        // target is not one. Width is still one segment per set, so this is a
+                        // deliberate aim rather than a thumb-sized button, which suits something
+                        // you reach for to correct a mistake and not on every set.
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .frame(height: 5)
     }
 
     // Spelled out as Colors rather than a ternary over mixed styles: `.tertiary` is a
