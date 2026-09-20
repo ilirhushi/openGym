@@ -1,21 +1,68 @@
 name: Deploy
 
-# Syncs docker-compose.yml / other tracked files to the VPS and pulls the
-# latest published images (ghcr.io/duartesantos8/opengym-*:latest) on top of
-# them. Does not build anything here: this fork runs the stock upstream app,
-# so "deploy" just means "reconcile the VPS with what main looks like now"
-# plus "pick up whatever upstream has released since the last deploy".
+# On push to main: build both images from source and push them to this repo's own
+# GHCR namespace (ghcr.io/<owner>/opengym-{api,web}:latest), then sync tracked files
+# to the VPS and have it pull those images and restart.
 #
-# .env, ./data, ./media and ./coach-auth are excluded from the sync on
-# purpose: none of them are tracked in git, and rsync --delete would wipe
-# them off the VPS otherwise.
+# This fork carries its own merged changes on top of upstream, so it can no longer
+# just consume upstream's published ghcr.io/duartesantos8/opengym-*:latest images —
+# those would be missing everything merged here. The VPS's own .env sets API_IMAGE /
+# WEB_IMAGE to point docker-compose.yml at this repo's images instead (see
+# docker-compose.yml's ${API_IMAGE:-...} / ${WEB_IMAGE:-...} defaults); that .env
+# lives only on the VPS and is not synced here.
+#
+# .env, ./data, ./media and ./coach-auth are excluded from the sync on purpose: none
+# of them are tracked in git, and rsync --delete would wipe them off the VPS otherwise.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE: ghcr.io/${{ github.repository_owner }}/opengym-api
+  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/opengym-web
+
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          push: true
+          tags: ${{ env.API_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
@@ -42,7 +89,7 @@ jobs:
           remote_user: ${{ secrets.VPS_USER }}
           remote_key: ${{ secrets.VPS_SSH_KEY }}
 
-      - name: Pull latest images and restart
+      - name: Pull freshly built images and restart
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
