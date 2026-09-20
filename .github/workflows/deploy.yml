@@ -1,0 +1,55 @@
+name: Deploy
+
+# Syncs docker-compose.yml / other tracked files to the VPS and pulls the
+# latest published images (ghcr.io/duartesantos8/opengym-*:latest) on top of
+# them. Does not build anything here: this fork runs the stock upstream app,
+# so "deploy" just means "reconcile the VPS with what main looks like now"
+# plus "pick up whatever upstream has released since the last deploy".
+#
+# .env, ./data, ./media and ./coach-auth are excluded from the sync on
+# purpose: none of them are tracked in git, and rsync --delete would wipe
+# them off the VPS otherwise.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync repo to VPS
+        uses: burnett01/rsync-deployments@v9
+        with:
+          switches: >-
+            -avz --delete --mkpath
+            --exclude=.git
+            --exclude=.github
+            --exclude=.env
+            --exclude=data
+            --exclude=media
+            --exclude=coach-auth
+            --exclude=node_modules
+            --exclude=frontend/node_modules
+            --exclude=frontend/android
+            --exclude=frontend/ios
+          path: ./
+          remote_path: /opt/opengym/
+          remote_host: ${{ secrets.VPS_HOST }}
+          remote_user: ${{ secrets.VPS_USER }}
+          remote_key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Pull latest images and restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/opengym
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
