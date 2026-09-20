@@ -1,5 +1,5 @@
 // Weekly training-volume and workout-frequency trend, feeding the Stats page's Training
-// Volume card. Reuses each workout's already-computed `vol` (tonnage) — no new per-set math.
+// Volume card. Reuses each workout's already-computed `vol` (tonnage), no new per-set math.
 import { weekKey, startOfWeek, isoOf, MONDAY } from './format.js'
 
 /**

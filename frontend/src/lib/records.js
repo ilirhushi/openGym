@@ -37,16 +37,22 @@ export function personalRecords(S) {
     let bestWeight = null
     let bestReps = null
     let bestOther = null // speed / distance / time
+    const everLoaded = workouts.some(w => {
+      const data = metricDataOf(w, id)
+      return data.mode === 'reps' && data.best > 0
+    })
     workouts.forEach(w => {
       const data = metricDataOf(w, id)
       if (!data.mode) return
       const t = w.start || new Date(w.d).getTime()
       if (data.mode === 'reps') {
-        if (data.best > 0) {
-          const better = isAssisted(id)
-            ? (bestWeight == null || data.best < bestWeight.value)
-            : (bestWeight == null || data.best > bestWeight.value)
-          if (better) bestWeight = { value: data.best, date: w.d, t, metric: 'weight' }
+        if (everLoaded) {
+          if (data.best > 0) {
+            const better = isAssisted(id)
+              ? (bestWeight == null || data.best < bestWeight.value)
+              : (bestWeight == null || data.best > bestWeight.value)
+            if (better) bestWeight = { value: data.best, date: w.d, t, metric: 'weight' }
+          }
         } else {
           const reps = Math.max(0, ...data.rows.map(completedRepsOf))
           if (reps > 0 && (bestReps == null || reps > bestReps.value)) bestReps = { value: reps, date: w.d, t, metric: 'reps' }
@@ -62,7 +68,7 @@ export function personalRecords(S) {
     if (bestReps) out.push({ id, ...bestReps })
     if (bestOther) out.push({ id, ...bestOther })
     const e1 = best1RM(S, id)
-    if (e1) out.push({ id, value: e1.est, date: e1.d, t: e1.t, metric: 'e1rm' })
+    if (e1) out.push({ id, value: e1.est, date: e1.d, t: e1.t || new Date(e1.d).getTime(), metric: 'e1rm' })
   })
   return out.sort((a, b) => b.t - a.t)
 }
