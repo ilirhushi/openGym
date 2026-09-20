@@ -1297,4 +1297,6 @@ export default {
   'Save as routine?': 'บันทึกเป็นรูทีนไหม',
   'Save as routine': 'บันทึกเป็นรูทีน',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'สร้างรูทีนอิสระจากเป้าหมายเหล่านี้ ประวัติการออกกำลังกายของคุณจะยังคงอยู่',
+  'Collapse completed exercises': 'ย่อท่าฝึกที่เสร็จแล้ว',
+  'Keep the current exercise open': 'เปิดท่าฝึกปัจจุบันไว้',
 }

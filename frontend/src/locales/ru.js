@@ -1286,4 +1286,6 @@ export default {
   'Save as routine?': 'Сохранить как тренировку?',
   'Save as routine': 'Сохранить как тренировку',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'Создать отдельную тренировку из этих целей. История тренировок сохранится.',
+  'Collapse completed exercises': 'Сворачивать завершённые упражнения',
+  'Keep the current exercise open': 'Оставлять текущее упражнение открытым',
 }

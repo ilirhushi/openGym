@@ -1289,4 +1289,6 @@ export default {
   'Save as routine?': 'Mentés rutinként?',
   'Save as routine': 'Mentés rutinként',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'Független rutin létrehozása ezekből a célokból. Az edzéstörténeted megmarad.',
+  'Collapse completed exercises': 'Befejezett gyakorlatok összecsukása',
+  'Keep the current exercise open': 'Az aktuális gyakorlat maradjon nyitva',
 }

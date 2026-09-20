@@ -1286,4 +1286,6 @@ export default {
   'Save as routine?': 'Rutin olarak kaydedilsin mi?',
   'Save as routine': 'Rutin olarak kaydet',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'Bu egzersiz hedeflerinden bağımsız bir rutin oluştur. Antrenman geçmişin korunur.',
+  'Collapse completed exercises': 'Tamamlanan egzersizleri daralt',
+  'Keep the current exercise open': 'Geçerli egzersizi açık tut',
 }

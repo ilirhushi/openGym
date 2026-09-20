@@ -1780,6 +1780,91 @@ describe('workout view header menu', () => {
     expect(mocks.S.active.workoutView).toBe('compact')
     expect(mocks.S.workoutView).toBe('cards')
   })
+
+  it('toggles completed exercises for the running list session and can show them again', async () => {
+    await mount([exercise('bench', [true]), exercise('row', [false])], 1, { active: { workoutView: 'list' } })
+    let layout = await openLayout(await openMenu())
+    expect(item(layout, 'Collapse completed exercises').on).toBe(false)
+    await act(async () => { item(layout, 'Collapse completed exercises').onClick() })
+    await rerender()
+    expect(container.querySelectorAll('.wl-summary').length).toBe(1)
+    expect(mocks.S.collapseCompleted).toBeUndefined()
+    layout = await openLayout(await openMenu())
+    expect(item(layout, 'Collapse completed exercises').on).toBe(true)
+    await act(async () => { item(layout, 'Collapse completed exercises').onClick() })
+    await rerender()
+    expect(container.querySelector('.wl-summary')).toBeNull()
+    expect(container.querySelectorAll('[role="checkbox"]').length).toBe(2)
+  })
+
+  it('only offers collapsing in layouts that show more than the current exercise', async () => {
+    await mount([exercise('bench', [true])], 0, { active: { workoutView: 'cards' } })
+    expect(item(await openLayout(await openMenu()), 'Collapse completed exercises')).toBeUndefined()
+  })
+})
+
+describe('collapsing completed workout exercises', () => {
+  const units = () => [...container.querySelectorAll('.wl-unit')]
+  // Not the "Set current" button: since #260/#262 that button also jumps the session into
+  // card view, which is a separate concern from what marks a unit current for collapsing.
+  // Setting S.active.cur directly exercises the collapse logic on its own.
+  const setCurrent = async index => {
+    mocks.S.active.cur = index
+    await rerender()
+  }
+
+  it.each(['list', 'compact'])('keeps the finished current exercise open in %s, then collapses it when moving on', async workoutView => {
+    await mount([exercise('bench', [true, false]), exercise('row', [false])], 0,
+      { active: { workoutView, collapseCompleted: true } })
+    await toggleSet(1)
+    await rerender()
+    expect(units()[0].querySelector('.wl-summary')).toBeNull()
+    const loggedSets = structuredClone(mocks.S.active.entries[0].sets)
+    await setCurrent(1)
+    expect(units()[0].querySelector('.wl-summary')).toBeTruthy()
+    expect(units()[0].querySelector('.setrow')).toBeNull()
+    expect(units()[0].querySelector('.exmedia')).toBeNull()
+    expect(units()[0].querySelector('[aria-expanded="false"]')).toBeTruthy()
+    expect(units()[1].querySelector('.setrow')).toBeTruthy()
+    expect(mocks.S.active.entries[0].sets).toEqual(loggedSets)
+    await setCurrent(0)
+    expect(units()[0].querySelectorAll('.setrow').length).toBe(2)
+    await toggleSet(0)
+    await setCurrent(1)
+    expect(units()[0].querySelector('.wl-summary')).toBeNull()
+  })
+
+  it('leaves completed exercises expanded unless the option is enabled', async () => {
+    await mount([exercise('bench', [true]), exercise('row', [false])], 1, { workoutView: 'list' })
+    expect(container.querySelector('.wl-summary')).toBeNull()
+  })
+
+  it('keeps an unfinished warm-up, one unfinished side and an empty exercise expanded', async () => {
+    await mount([
+      exercise('warmup', [false, true], { sets: [{ w: 20, r: 5, phase: 'warmup', done: false }, { w: 60, r: 5, done: true }] }),
+      exercise('side', [false], { target: { mode: 'reps', side: true }, sets: [{ done: false, sides: { L: { done: true }, R: { done: false } } }] }),
+      exercise('empty', []), exercise('current', [false]),
+    ], 3, { active: { workoutView: 'list', collapseCompleted: true } })
+    expect(container.querySelector('.wl-summary')).toBeNull()
+  })
+
+  it('collapses a superset only after all members are done and the group is no longer current', async () => {
+    await mount([exercise('bench', [true], { sg: 'pair' }), exercise('row', [false], { sg: 'pair' }), exercise('squat', [false])], 2,
+      { active: { workoutView: 'list', collapseCompleted: true } })
+    expect(units()[0].querySelector('.wl-summary')).toBeNull()
+    await toggleSet(1)
+    await rerender()
+    expect(units()[0].querySelectorAll('.wl-summary .tag').length).toBe(2)
+    await setCurrent(0)
+    expect(units()[0].querySelectorAll('[role="checkbox"]').length).toBe(2)
+  })
+
+  it('treats duplicate exercise occurrences separately when restoring a running session', async () => {
+    await mount([exercise('bench', [true]), exercise('bench', [false]), exercise('row', [false])], 2,
+      { active: { workoutView: 'compact', collapseCompleted: true } })
+    expect(units()[0].querySelector('.wl-summary')).toBeTruthy()
+    expect(units()[1].querySelector('.wl-summary')).toBeNull()
+  })
 })
 
 describe('workout controls: the more menu and the set menu', () => {

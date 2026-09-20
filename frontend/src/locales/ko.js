@@ -1286,4 +1286,6 @@ export default {
   'Save as routine?': '루틴으로 저장할까요?',
   'Save as routine': '루틴으로 저장',
   'Create an independent routine from these exercise targets. Your workout history is kept.': '이 운동 목표로 독립 루틴을 만듭니다. 운동 기록은 그대로 유지됩니다.',
+  'Collapse completed exercises': '완료한 운동 접기',
+  'Keep the current exercise open': '현재 운동은 펼쳐 두기',
 }

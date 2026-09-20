@@ -1286,4 +1286,6 @@ export default {
   'Save as routine?': 'Zapisać jako rutynę?',
   'Save as routine': 'Zapisz jako rutynę',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'Utwórz niezależną rutynę z tych celów ćwiczeń. Historia treningów pozostanie bez zmian.',
+  'Collapse completed exercises': 'Zwijaj ukończone ćwiczenia',
+  'Keep the current exercise open': 'Bieżące ćwiczenie pozostaje rozwinięte',
 }

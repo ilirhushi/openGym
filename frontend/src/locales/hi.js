@@ -1286,4 +1286,6 @@ export default {
   'Save as routine?': 'रूटीन के रूप में सहेजें?',
   'Save as routine': 'रूटीन के रूप में सहेजें',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'इन व्यायाम लक्ष्यों से एक स्वतंत्र रूटीन बनाएँ। आपका वर्कआउट इतिहास सुरक्षित रहेगा।',
+  'Collapse completed exercises': 'पूरे हुए व्यायाम समेटें',
+  'Keep the current exercise open': 'वर्तमान व्यायाम खुला रखें',
 }

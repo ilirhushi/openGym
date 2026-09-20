@@ -704,6 +704,8 @@ export const PT_BR_OVERRIDES = {
   'Save as routine?': 'Salvar como rotina?',
   'Save as routine': 'Salvar como rotina',
   'Create an independent routine from these exercise targets. Your workout history is kept.': 'Criar uma rotina independente a partir destes objetivos. O histórico de treinos será mantido.',
+  'Collapse completed exercises': 'Recolher exercícios concluídos',
+  'Keep the current exercise open': 'Manter o exercício atual aberto',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }
