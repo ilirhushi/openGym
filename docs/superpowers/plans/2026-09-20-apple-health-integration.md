@@ -17,7 +17,7 @@
 - **No linter or formatter is configured.** Match surrounding style by hand: two-space indent, no semicolons in JS, single quotes.
 - **Anything deciding what gets recorded is a pure helper in `frontend/src/lib/` with a `*.test.js` beside it** (CONTRIBUTING.md). Native files must contain no such decision.
 - **iOS only.** Android Health Connect is explicitly deferred (spec §10.1). Do not add Android code, Gradle entries, or `isAndroid()` branches for health.
-- **Health data must never reach openGym's server** on any deployment. Nothing added here may go through `lib/api.js` or `pushState`.
+- **Health data must never reach a third party, and openGym must never phone home.** Nothing added here may open a new network path, and nothing added here calls `lib/api.js` or `pushState` itself. The one measurement openGym stores of its own (`w.hr`, spec 5.3) is a field on the workout record, so it syncs to the user's own self-hosted server with that record exactly like every other field on it: that is intended, not a leak (spec section 2).
 - **Only a live phone finish writes to Health.** Backfill, workout edits, CSV/Hevy import and demo seed must not (spec §3.4).
 - **Never use em dashes** in code, comments, commit messages or docs.
 - **Commit message style:** sentence case, no `feat:`/`fix:` prefixes. Match existing history, for example "Add design spec for Stats page progress cards".

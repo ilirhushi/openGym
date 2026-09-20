@@ -29,7 +29,11 @@ design owes it.
   (CONTRIBUTING.md). This is load-bearing here, because the repo has no Swift or Kotlin test
   harness at all. Every decision therefore lives in JS; the native files contain no branching
   logic about whether or what to write.
-- **No backend on the mobile flavor.** Health data never touches openGym's server. On the
+- **No third party, and no phoning home.** Health data never reaches a third party, and openGym
+  never sends anything anywhere on its own. What this does not mean is that a measurement attached
+  to your own workout record is stripped out of it: the `hr` summary (section 5.3) rides on the
+  workout record and therefore syncs to *your own* self-hosted server with that record, exactly
+  like every other field on it. Nothing added here opens a new network path, and on the
   self-hosted web build this whole feature is absent, not degraded.
 - **No telemetry, user owns their data** (README). Health access is opt-in, off by default, and
   the permission prompt is only ever raised by a direct user action.
@@ -167,6 +171,15 @@ The `completedSession` payload gains one optional object, and nothing else chang
 
 The invariant this encodes is **exactly one health record per session, never zero and never two.**
 
+**Known and accepted: a same-day "replace" can leave two records in Health.** If a workout is
+finished live on the phone (and written to Health), and a Watch session then arrives for the same
+day and the user chooses "replace", openGym's history holds one workout while Health holds two.
+This is a direct consequence of decision 3.4: openGym never deletes the user's health records, so
+the record the replaced workout already produced stays where it is. The invariant above is
+per-session, not per-history-row, and a replace collapses two sessions into one row after the
+fact. Deleting health data the user did not ask us to delete is the worse of the two options, so
+this is accepted rather than fixed.
+
 ### 5.3 The workout record
 
 Following the convention already established in `finish-workout.js` (`rid`, `noProg`, `note` are
@@ -180,6 +193,13 @@ summary lands as one optional key:
 This needs **no change to `finish-workout.js`**. `watch-import.js` already post-decorates the
 built record (`w.vol = workoutVolume(w)`) and sets `w.hr` the same way. Every non-Watch workout
 is unchanged on disk, and older profiles read back identically.
+
+Because `hr` is an ordinary key on the workout record, it syncs to the user's own self-hosted
+server along with the rest of that record, through the same `pushState` path every workout field
+already takes. That is consistent with section 2 and deliberate: the point of storing the summary
+in openGym at all (decision 3.7) is that it not be locked inside Apple's ecosystem, and a workout
+that syncs everywhere except its heart rate would defeat that. No third party sees it and openGym
+never phones home; it lands on the user's own server, where their training data already lives.
 
 ### 5.4 Body weight read
 
@@ -332,7 +352,9 @@ a way that implies it covers exactly openGym's own time window.
 - Writing on backfill, on edit of a logged workout, on CSV/Hevy import, or on demo seed (§3.4).
 - The full per-second heart-rate series in openGym's own records (§3.7).
 - Android Health Connect in this spec (deferred, see §10.1), and a Wear OS companion at all.
-- Any health data reaching openGym's server, on any deployment.
+- Any health data reaching a third party, or openGym sending anything anywhere on its own (see
+  section 2: the `hr` summary on a workout record syncs to the user's own server with that record,
+  and no new network path is added).
 - Route/GPS data, VO2 max, sleep, or any health type beyond workouts and body weight.
 
 ### 10.1 Deferred: Android Health Connect
