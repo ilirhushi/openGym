@@ -53,10 +53,20 @@ struct SessionView: View {
             } else if set.min != nil {
                 Text("\(Int(set.min ?? 0)) min @ \(String(format: "%.1f", set.speed ?? 0))")
             } else {
-                Stepper(value: Binding(
-                    get: { session.entries[i].sets[j].w ?? 0 },
-                    set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.w = newValue } }), in: 0...500, step: 2.5) {
-                    Text("\(String(format: "%.1f", set.w ?? 0)) x \(set.r ?? 0)")
+                // Reps needs its own Stepper, not just weight — an unchecked adjustment here
+                // (e.g. 6 of a planned 8) still logs as "done" with the planned rep count
+                // otherwise, and progression.js's next-session decision reads the logged reps.
+                VStack(alignment: .leading, spacing: 2) {
+                    Stepper(value: Binding(
+                        get: { session.entries[i].sets[j].w ?? 0 },
+                        set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.w = newValue } }), in: 0...500, step: 2.5) {
+                        Text("\(String(format: "%.1f", set.w ?? 0))")
+                    }
+                    Stepper(value: Binding(
+                        get: { session.entries[i].sets[j].r ?? 0 },
+                        set: { newValue in updateSet(entryIndex: i, setIndex: j) { $0.r = newValue } }), in: 0...50, step: 1) {
+                        Text("\(set.r ?? 0) reps")
+                    }
                 }
             }
             Spacer()

@@ -68,9 +68,13 @@ public class WatchBridge: CAPPlugin, WCSessionDelegate {
     public func sessionDidDeactivate(_ session: WCSession) { session.activate() }
 
     // A completed session, sent from the Watch via transferUserInfo (queued, background-capable —
-    // delivered here whether the app was foreground, background, or just-launched for this).
+    // delivered here whether the app was foreground, background, or just-launched for this). This
+    // delegate call can land before the WebView (and initWatchBridge's JS listener) has finished
+    // booting — WCSession activates in load(), at bridge setup, well before that. Without
+    // retainUntilConsumed, notifyListeners with no listener yet registered just drops the event:
+    // Capacitor only replays a retained event once a listener attaches, never one it discarded.
     public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         guard let payload = userInfo["payload"] as? String else { return }
-        notifyListeners("watchSessionReceived", data: ["payload": payload])
+        notifyListeners("watchSessionReceived", data: ["payload": payload], retainUntilConsumed: true)
     }
 }

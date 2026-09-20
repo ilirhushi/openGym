@@ -34,6 +34,13 @@ export function buildWatchPlanPayload(S, iso = todayISO()) {
         target: entry.target,
         lastTime: last ? { d: last.d, w: bestWeightForEntry({ target: last.target, sets: last.sets }) || null } : null,
         sets: entry.sets.map(flattenSetForWatch),
+        // Round-tripped opaque to the Watch (never read there — see WatchEntry) and read back on
+        // return: buildCompletedWorkout freezes noProg per entry at finish time (progression.js's
+        // "which routine counts" rule), and rid is which routine a multi-routine day's entry came
+        // from. Dropping either on the Watch trip would unfreeze a rehab-routine entry's
+        // exclusion, or lose which routine a combined session's entry belongs to.
+        ...(entry.rid ? { rid: entry.rid } : {}),
+        ...(entry.noProg === true ? { noProg: true } : {}),
       }
     }),
     activeOnPhone: !!S.active,

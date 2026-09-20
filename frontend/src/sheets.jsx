@@ -2144,17 +2144,29 @@ function doFinishWorkout() {
 // A session logged on the Watch arrives here already finished (design doc §3: the Watch never
 // runs progression). This only decides same-day placement and applies the result, reusing the
 // existing SameDayChoice sheet for the conflict case instead of inventing a new one.
-export function handleIncomingWatchSession(payload) {
-  const st = S()
-  decideWatchImport(st, payload, {
-    apply: ({ workouts, exWeights, w, prs, e1prs }) => {
+//
+// `markSeen` (from watch-bridge.js's initWatchBridge) must only be called once the session has
+// actually landed in `s.workouts` — not any earlier. The conflict sheet is `locked: true` so it
+// can't be dismissed without a choice (backdrop tap, Escape, swipe, hardware back all no-op on a
+// locked sheet), and markSeen is the second, independent safety net: if the app is killed before
+// the user responds, the session stays unseen and this handler runs again next launch instead of
+// the workout being silently lost.
+export function handleIncomingWatchSession(payload, markSeen) {
+  decideWatchImport(S, payload, {
+    apply: result => {
+      // finishWatchSession returns null when nothing was actually logged on the Watch (Start,
+      // then Finish with no set checked off) — nothing to insert, but still a session that was
+      // handled, so it's still marked seen rather than retried forever.
+      if (!result) { markSeen(); return }
+      const { workouts, exWeights, w, prs, e1prs } = result
       update(s => { s.workouts = workouts; s.exWeights = exWeights })
       useStore.getState().autoBackupNow()
+      markSeen()
       ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
     },
     askUser: (existing, choose) => {
       ui().openSheet(c => <SameDayChoice iso={payload.date} existing={existing} close={c}
-        onReplace={id => { c(); choose(id) }} onAdd={() => { c(); choose(null) }} />, { kind: 'center' })
+        onReplace={id => { c(); choose(id) }} onAdd={() => { c(); choose(null) }} />, { kind: 'center', locked: true })
     },
   })
 }

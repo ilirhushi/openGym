@@ -18,6 +18,12 @@ struct WatchEntry: Codable, Identifiable, Hashable {
     var id: String            // exercise id, matches entry.id on the phone
     var label: String
     var sets: [WatchSet]
+    // Opaque to the Watch — never read or shown here, only carried from the incoming plan
+    // through to the outgoing completed session unchanged, so watch-import.js's
+    // buildCompletedWorkout sees the same rid/noProg a phone-logged session would (which routine
+    // entry came from; whether it's excluded from progression) instead of losing them.
+    var rid: String?
+    var noProg: Bool?
 }
 
 struct WatchPlan: Codable {
@@ -61,11 +67,21 @@ final class WatchSessionStore: ObservableObject {
         Self.save(plan, key: planKey, to: defaults)
     }
 
+    // The Watch's own local-date reading, matching the phone's todayISO() (local calendar day,
+    // not UTC) — never plan.date. plan.date is whatever day it was when the plan last synced,
+    // which can be stale by the time Start is actually tapped (the whole point of running
+    // offline); using it would file the workout under the wrong day and could manufacture a
+    // same-day conflict against an unrelated real workout on that stale date.
+    private func todayISO() -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
+    }
+
     func startSession() {
         guard let plan = plan else { return }
         let session = WatchActiveSession(
             watchSessionId: UUID().uuidString,
-            date: plan.date, start: Date().timeIntervalSince1970 * 1000,
+            date: todayISO(), start: Date().timeIntervalSince1970 * 1000,
             routineIds: plan.routineIds, name: plan.name, entries: plan.entries
         )
         activeSession = session

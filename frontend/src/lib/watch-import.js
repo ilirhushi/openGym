@@ -43,12 +43,16 @@ export function computeWatchPRs(st, active) {
  * `replaceId`, when given (the user's choice in the same-day merge sheet — Task 3), is an
  * existing same-day workout to overwrite; omitted, the session is inserted alongside whatever
  * is already on that day, in chronological order (insertChronological).
- * Returns the pieces the store needs to apply, pure, no store access.
+ * Returns the pieces the store needs to apply, pure, no store access. Returns null when nothing
+ * was actually logged (Start tapped, then Finish with no set checked off) — buildCompletedWorkout
+ * already drops every entry with no completed work, so an all-empty session would otherwise
+ * insert a phantom zero-set workout into history with nothing to show for it.
  */
 export function finishWatchSession(st, payload, { replaceId = null } = {}) {
   const active = activeFromWatchPayload(payload)
   const { prs, e1prs } = computeWatchPRs(st, active)
   const w = buildCompletedWorkout(active, { end: payload.end, prs })
+  if (!w.entries.length) return null
   w.vol = workoutVolume(w)
   const kept = replaceId ? st.workouts.filter(x => x.id !== replaceId) : st.workouts
   const workouts = insertChronological(kept, w)

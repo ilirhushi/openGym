@@ -53,11 +53,18 @@ export async function syncTodayPlanToWatch(S, iso) {
  * replace-or-add decision `sheets.jsx`'s SameDayChoice already makes for backfilled workouts).
  * `apply(result)` receives `finishWatchSession`'s return value; `askUser(existing, choose)` is
  * given the conflicting workouts and a `choose(replaceId | null)` callback to resolve with.
+ *
+ * Takes `getState` (a `() => st` thunk) rather than a single `st` snapshot: the askUser path
+ * waits on a user decision, which can take a while, and computing the merge against a snapshot
+ * taken before the sheet opened would silently clobber anything that changed `st.workouts` in
+ * the meantime (a phone workout finished, a server sync merge landing) — `update()` assigns the
+ * whole array, not a diff. Re-reading state exactly when the choice resolves avoids that.
  */
-export function decideWatchImport(st, payload, { apply, askUser }) {
+export function decideWatchImport(getState, payload, { apply, askUser }) {
+  const st = getState()
   const existing = workoutsOn(st, payload.date)
   if (!existing.length) { apply(finishWatchSession(st, payload)); return }
-  askUser(existing, replaceId => apply(finishWatchSession(st, payload, { replaceId })))
+  askUser(existing, replaceId => apply(finishWatchSession(getState(), payload, { replaceId })))
 }
 
 /** Watch-pairing status for Settings' "Apple Watch" row: null off mobile, on a non-iOS platform,
@@ -68,8 +75,12 @@ export async function getWatchStatus() {
   try { return await p.getStatus() } catch (e) { return null }
 }
 
-/** Register the native listener for completed Watch sessions. `onSession(payload)` is called
- * once per incoming session (already JSON.parsed). No-op off mobile. */
+/** Register the native listener for completed Watch sessions. `onSession(payload, markSeen)` is
+ * called once per incoming session (already JSON.parsed) — `markSeen()` must be called by the
+ * caller once (and only once) the session has actually been applied to history, not merely
+ * handed off. Marking it seen any earlier would mean a same-day conflict sheet dismissed (or the
+ * app killed) before the user chooses loses the workout for good: nothing else holds a durable
+ * copy of it once this event has fired, and it isn't redelivered on demand. No-op off mobile. */
 export async function initWatchBridge(onSession) {
   const p = await plugin()
   if (!p) return
@@ -78,8 +89,10 @@ export async function initWatchBridge(onSession) {
     let payload
     try { payload = JSON.parse(ev.payload) } catch (e) { return }
     if (!payload?.watchSessionId || isWatchSessionSeen(seenIds, payload.watchSessionId)) return
-    seenIds = withWatchSessionSeen(seenIds, payload.watchSessionId)
-    await writeJsonFile(SEEN_FILE, seenIds)
-    onSession(payload)
+    const markSeen = async () => {
+      seenIds = withWatchSessionSeen(seenIds, payload.watchSessionId)
+      await writeJsonFile(SEEN_FILE, seenIds)
+    }
+    onSession(payload, markSeen)
   })
 }

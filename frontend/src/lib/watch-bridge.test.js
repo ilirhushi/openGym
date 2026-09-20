@@ -29,7 +29,7 @@ describe('decideWatchImport', () => {
     const askUser = vi.fn()
     const st = { workouts: [], exWeights: {}, unit: 'kg' }
     const payload = { watchSessionId: 'w1', date: '2026-09-21', start: 0, end: 1, routineIds: [], name: 'Push', entries: [] }
-    decideWatchImport(st, payload, { apply, askUser })
+    decideWatchImport(() => st, payload, { apply, askUser })
     expect(apply).toHaveBeenCalledTimes(1)
     expect(askUser).not.toHaveBeenCalled()
   })
@@ -38,11 +38,23 @@ describe('decideWatchImport', () => {
     const askUser = vi.fn()
     const st = { workouts: [{ id: 'old', d: '2026-09-21', start: 100, entries: [] }], exWeights: {}, unit: 'kg' }
     const payload = { watchSessionId: 'w1', date: '2026-09-21', start: 0, end: 1, routineIds: [], name: 'Push', entries: [] }
-    decideWatchImport(st, payload, { apply, askUser })
+    decideWatchImport(() => st, payload, { apply, askUser })
     expect(askUser).toHaveBeenCalledTimes(1)
     expect(apply).not.toHaveBeenCalled()
     const [existing] = askUser.mock.calls[0]
     expect(existing.map(w => w.id)).toEqual(['old'])
+  })
+  it('re-reads state when the user resolves a conflict, not the stale snapshot from when the sheet opened', () => {
+    const base = { workouts: [{ id: 'old', d: '2026-09-21', start: 100, entries: [] }], exWeights: {}, unit: 'kg' }
+    const getState = vi.fn(() => base)
+    const payload = { watchSessionId: 'w1', date: '2026-09-21', start: 0, end: 1, routineIds: [], name: 'Push', entries: [] }
+    let choose
+    decideWatchImport(getState, payload, { apply: vi.fn(), askUser: (existing, c) => { choose = c } })
+    expect(getState).toHaveBeenCalledTimes(1) // the initial read, to find the conflict
+    choose(null)
+    // A second read, at the moment the user actually resolves the conflict — not reusing the
+    // snapshot from when the sheet opened, which could be stale by however long the user took.
+    expect(getState).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -72,7 +84,12 @@ describe('initWatchBridge redelivery gating', () => {
     // Import initWatchBridge after mocks are in place
     const { initWatchBridge } = await import('./watch-bridge.js')
 
-    const onSessionSpy = vi.fn()
+    // onSession's second argument (markSeen) is the caller's job to invoke once the session has
+    // actually been applied — sheets.jsx's handleIncomingWatchSession does this after the
+    // workout lands in history (or, for a same-day conflict, after the user chooses), not before
+    // (a dismissed conflict sheet must not have already marked the session seen — see
+    // sheets.jsx's comment). This spy calls it immediately, standing in for the no-conflict path.
+    const onSessionSpy = vi.fn((payload, markSeen) => markSeen())
     await initWatchBridge(onSessionSpy)
 
     // Verify the listener was registered
@@ -98,10 +115,10 @@ describe('initWatchBridge redelivery gating', () => {
     // Verify onSession was called exactly once despite two events
     expect(onSessionSpy).toHaveBeenCalledTimes(1)
 
-    // Verify the payload passed was the parsed JSON
+    // Verify the payload passed was the parsed JSON, plus a markSeen function
     expect(onSessionSpy).toHaveBeenCalledWith(expect.objectContaining({
       watchSessionId: 'w1',
       date: '2026-09-21'
-    }))
+    }), expect.any(Function))
   })
 })

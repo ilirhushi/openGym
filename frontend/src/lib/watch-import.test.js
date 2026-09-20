@@ -56,4 +56,17 @@ describe('finishWatchSession', () => {
     const { workouts } = finishWatchSession(st, payload())
     expect(workouts.map(w => w.id).sort()).toEqual(['old', 'w1'])
   })
+  it('returns null instead of inserting a phantom workout when nothing was actually logged', () => {
+    const st = { workouts: [], exWeights: {}, unit: 'kg' }
+    const emptySession = payload({ entries: [{ id: 'bench-press', sets: [{ phase: 'work', w: 0, r: 0, done: false }] }] })
+    expect(finishWatchSession(st, emptySession)).toBeNull()
+  })
+  it('round-trips rid/noProg through to the inserted workout entry', () => {
+    const st = { workouts: [], exWeights: {}, unit: 'kg' }
+    const rehab = payload({ entries: [{ id: 'bench-press', rid: 'routine-2', noProg: true, sets: [
+      { phase: 'work', w: 40, r: 10, done: true },
+    ] } ] })
+    const { w } = finishWatchSession(st, rehab)
+    expect(w.entries[0]).toMatchObject({ rid: 'routine-2', noProg: true })
+  })
 })
