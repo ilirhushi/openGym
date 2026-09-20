@@ -6,6 +6,7 @@ import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { guestAllowed } from '../lib/guest.js'
 import { MOBILE, initReminderSync, nativeLoad, nativeSave, onAppActive, syncReminder, writeAutoBackup } from '../lib/mobile.js'
+import { syncTodayPlanToWatch, initWatchBridge } from '../lib/watch-bridge.js'
 import { mergeStates, localExtras } from '../lib/sync-merge.js'
 import { prepareLocalStateForEditMerge, rebuildHistoryDerived, saveWorkoutEdit } from '../lib/session-edit.js'
 import { loadRemote, chooseLocal, forgetRemote, connect } from '../lib/remote.js'
@@ -176,12 +177,21 @@ export const useStore = create((set, get) => {
   const owes = () => localStorage.getItem('gym_dirty') === '1' || pushTm !== null || pushPending
 
   initReminderSync(() => get().S)
+  // handleIncomingWatchSession is imported lazily (like the useUI.js imports below) to avoid a
+  // cycle, since sheets.jsx imports from the store.
+  import('../sheets.jsx').then(({ handleIncomingWatchSession }) => initWatchBridge(handleIncomingWatchSession)).catch(() => {})
 
   // Mobile build: mirror the state into a file in the app's data directory (survives WebView
-  // storage eviction) and keep the native reminder schedule in step with the weekly plan.
+  // storage eviction) and keep the native reminder schedule and the Watch's copy of today's plan
+  // in step with the weekly plan.
   const nativePersist = () => {
     clearTimeout(saveTm)
-    saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S) }, 800)
+    saveTm = setTimeout(() => {
+      saveTm = null
+      nativeSave(get().S)
+      syncReminder(get().S)
+      syncTodayPlanToWatch(get().S)
+    }, 800)
   }
 
   // `_ts` is when this device last changed the data — it decides which copy wins on the next
@@ -257,7 +267,8 @@ export const useStore = create((set, get) => {
   window.addEventListener('focus', () => checkRev())
   window.addEventListener('pageshow', e => { if (e.persisted) checkRev() })
   window.addEventListener('online', () => checkRev(true))   // also retries a push that failed offline
-  onAppActive(() => checkRev())
+  // A Watch that's been out of range should get the latest plan the moment the phone comes back.
+  onAppActive(() => { checkRev(); if (MOBILE) syncTodayPlanToWatch(get().S) })
   schedulePoll()
 
   // Both copies changed: keep both sides' entries, let the newer copy decide the rest

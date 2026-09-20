@@ -40,6 +40,32 @@ or Settings → **"Connect to my server"** later) to finish. Notes:
 - Settings → "Disconnect" syncs one last time, then drops the device cleanly back to local
   mode.
 
+### Apple Watch companion
+
+The iOS app has an optional Apple Watch companion (`frontend/ios/App/WatchApp`) that starts and
+logs today's scheduled workout from the wrist, phone optional. It's a native SwiftUI app, not a
+Capacitor/web view — watchOS doesn't support that. The Watch keeps its own local copy of today's
+plan (synced from the phone via `WatchConnectivity` whenever the plan changes or the phone comes
+back into range) and can run a whole session with the phone unreachable; the iPhone app is what
+finishes the workout (progression, PRs, history) once the two devices reconnect. Settings → "Apple
+Watch" shows whether one is paired and whether the Watch app is installed on it.
+
+Build it the same way as the iPhone app: open `ios/App/App.xcworkspace` in Xcode, select the
+`WatchApp Watch App` scheme, and run it on a paired Watch (Simulator or a physical Watch paired to
+the iPhone you're running the `App` scheme on). Free Xcode signing applies here too, same 7-day
+renewal as the iPhone app (see "iPhone — what's actually possible" below) — the Watch target's
+bundle id is the iPhone app's own bundle id with `.watchkitapp` appended, and it shares the same
+signing team, so it follows whichever bundle id/team this checkout's `App` target is actually
+configured with (not necessarily what's committed in `capacitor.config.json`, if that's been
+customized for a fork).
+
+Phase 1 (current): straight work + warmup sets, reps/time/cardio modes, today's plan only. No
+drop-sets, rest-pause, or per-side sets on the Watch yet — those still need the phone or the web
+app; see `docs/superpowers/specs/2026-09-20-apple-watch-app-design.md` §8 for the planned
+follow-on. There is no automated test coverage for the Swift code (no Swift test harness in this
+repo) — changes here need manual verification (`xcodebuild` for both schemes, a Simulator
+install/launch) rather than a test run.
+
 ## Prerequisites
 
 - Node 20+

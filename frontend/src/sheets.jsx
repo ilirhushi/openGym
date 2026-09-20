@@ -43,6 +43,7 @@ import { workoutsOn, backfillStart, backfillEnd, completeBackfill } from './lib/
 import { editCompletedSession } from './lib/session-edit.js'
 import { moveWorkout, sameWorkout, startTimeOf } from './lib/workout-date.js'
 import { queueRemaining, pinState } from './lib/queue.js'
+import { decideWatchImport } from './lib/watch-bridge.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -2267,7 +2268,7 @@ function LogPastWorkout({ close }) {
 }
 // Three ways out when the day already has a workout. Replacing with several on that day means
 // picking which one; the rest of the day is left alone.
-function SameDayChoice({ iso, existing, onReplace, onAdd, close }) {
+export function SameDayChoice({ iso, existing, onReplace, onAdd, close }) {
   return <div style={{ textAlign: 'center', padding: '4px 0' }}>
     <h3 style={{ marginBottom: 8 }}>{fmtDate(iso, true)}</h3>
     <div className="muted" style={{ marginBottom: 18, lineHeight: 1.5 }}>{t('There is already a workout on that day.')}</div>
@@ -2629,7 +2630,7 @@ export function exitWorkoutEdit(onExit = () => nav('/history')) {
   </>, { kind: 'center' })
 }
 
-function FinishSummary({ w, prs, e1prs = [], close }) {
+export function FinishSummary({ w, prs, e1prs = [], close }) {
   const st = useStore(s => s.S)
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
@@ -2710,4 +2711,35 @@ function doFinishWorkout() {
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
   ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
+}
+
+/* ============================ Apple Watch session import ============================ */
+// A session logged on the Watch arrives here already finished (design doc §3: the Watch never
+// runs progression). This only decides same-day placement and applies the result, reusing the
+// existing SameDayChoice sheet for the conflict case instead of inventing a new one.
+//
+// `markSeen` (from watch-bridge.js's initWatchBridge) must only be called once the session has
+// actually landed in `s.workouts` — not any earlier. The conflict sheet is `locked: true` so it
+// can't be dismissed without a choice (backdrop tap, Escape, swipe, hardware back all no-op on a
+// locked sheet), and markSeen is the second, independent safety net: if the app is killed before
+// the user responds, the session stays unseen and this handler runs again next launch instead of
+// the workout being silently lost.
+export function handleIncomingWatchSession(payload, markSeen) {
+  decideWatchImport(S, payload, {
+    apply: result => {
+      // finishWatchSession returns null when nothing was actually logged on the Watch (Start,
+      // then Finish with no set checked off) — nothing to insert, but still a session that was
+      // handled, so it's still marked seen rather than retried forever.
+      if (!result) { markSeen(); return }
+      const { workouts, exWeights, w, prs, e1prs } = result
+      update(s => { s.workouts = workouts; s.exWeights = exWeights })
+      useStore.getState().autoBackupNow()
+      markSeen()
+      ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
+    },
+    askUser: (existing, choose) => {
+      ui().openSheet(c => <SameDayChoice iso={payload.date} existing={existing} close={c}
+        onReplace={id => { c(); choose(id) }} onAdd={() => { c(); choose(null) }} />, { kind: 'center', locked: true })
+    },
+  })
 }

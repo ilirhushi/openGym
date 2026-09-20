@@ -31,6 +31,19 @@ export async function isAndroid() {
   }
 }
 
+// The Apple Watch companion (lib/watch-bridge.js) only exists on iOS — same reasoning as
+// isAndroid() above, mirrored for the other platform.
+export async function isIOS() {
+  if (!MOBILE) return false
+  try {
+    const { Capacitor } = await import('@capacitor/core')
+    return Capacitor.getPlatform() === 'ios'
+  } catch (e) {
+    console.error('isIOS() failed:', e)
+    return false
+  }
+}
+
 const FILE = 'opengym-state.json'
 
 export async function nativeLoad() {

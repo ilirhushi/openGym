@@ -14,7 +14,8 @@ import { pushSupported, enablePush, disablePush, sendTestPush, syncPushSubscript
 import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, baseLang } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { MOBILE, isAndroid, shareExport, syncReminder } from '../lib/mobile.js'
+import { MOBILE, isAndroid, isIOS, shareExport, syncReminder } from '../lib/mobile.js'
+import { getWatchStatus } from '../lib/watch-bridge.js'
 import { checkForUpdate, downloadAndInstall } from '../lib/update.js'
 import { forgetCoach } from '../lib/coach-api.js'
 import { ConnectSheet } from './MobileOnboarding.jsx'
@@ -86,6 +87,14 @@ export default function Settings() {
     // from even asking (and from calling gitlab.com on every Settings visit).
     if (!MOBILE) return
     isAndroid().then(ok => { setAndroid(ok); if (ok) checkForUpdate().then(setUpdateInfo).catch(() => {}) })
+  }, [])
+
+  // --- Apple Watch companion status ---
+  const [ios, setIos] = useState(false)
+  const [watchStatus, setWatchStatus] = useState(null) // { supported, paired, watchAppInstalled, reachable } | null
+  useEffect(() => {
+    if (!MOBILE) return
+    isIOS().then(ok => { setIos(ok); if (ok) getWatchStatus().then(setWatchStatus) })
   }, [])
 
   // The same check, on demand: the automatic one is silent when it finds nothing or cannot
@@ -256,6 +265,20 @@ export default function Settings() {
       <Row icon="sparkles" iconTint="var(--acc)" title={t('AI Coach')} accessory="chevron"
         subtitle={coachLocal?.mode === 'server' ? t('Runs on your openGym server') : coachLocal?.mode === 'byok' ? t('Runs on this phone with your own API key') : t('Off — choose how the Coach should run.')}
         onClick={() => nav('/coach/setup')} />
+    </Section>}
+
+    {/* ---------- Apple Watch companion (docs/superpowers/specs/2026-09-20-apple-watch-app-design.md) ---------- */}
+    {MOBILE && ios && watchStatus && <Section title={t('Apple Watch')}>
+      {watchStatus.watchAppInstalled ? (
+        <Row icon="clock" iconTint="var(--green)" title={t('Connected')}
+          subtitle={t('The Watch app is installed and paired — today’s plan syncs automatically.')} />
+      ) : watchStatus.paired ? (
+        <Row icon="clock" iconTint="var(--orange)" title={t('Watch app not installed')}
+          subtitle={t('Not distributed through any app store — build and run the WatchApp target from Xcode onto your paired watch.')} />
+      ) : (
+        <Row icon="clock" iconTint="var(--grey)" title={t('No Apple Watch paired')}
+          subtitle={t('Pair a watch to this iPhone in the Apple Watch app to use it with openGym.')} />
+      )}
     </Section>}
 
     {/* ---------- general ---------- */}
