@@ -33,6 +33,11 @@ struct WatchEntry: Codable, Identifiable, Hashable {
     // set, into the first work set, is `rest`, because that is the rest the first heavy set
     // needs. See warmupRestSecFor in supersetFlow.js, whose rule SessionView applies.
     var warmupRest: Int?
+    // Absolute URL of the exercise photo, when the build has a media base the Watch can reach
+    // (watch-sync.js's watchImageUrl). Only the address crosses: updateApplicationContext is a
+    // small-state channel and a day of photos would not fit through it, so the Watch fetches
+    // and caches the bytes itself.
+    var img: String?
 }
 
 struct WatchPlan: Codable {

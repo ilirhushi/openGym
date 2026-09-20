@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { flattenSetForWatch, buildWatchPlanPayload } from './watch-sync.js'
+import { flattenSetForWatch, buildWatchPlanPayload, watchImageUrl } from './watch-sync.js'
 
 describe('flattenSetForWatch', () => {
   it('keeps a straight reps row as-is', () => {
@@ -21,6 +21,21 @@ describe('flattenSetForWatch', () => {
   it('flattens a per-side row to its synced scalar aggregate', () => {
     const side = { sides: { L: { w: 20, r: 6, done: true }, R: { w: 20, r: 6, done: true } }, w: 20, r: 12, done: true }
     expect(flattenSetForWatch(side)).toEqual({ phase: 'work', w: 20, r: 12, done: false })
+  })
+})
+
+describe('watchImageUrl', () => {
+  // The default media base is a relative "img/" served next to the web app. The Watch has no
+  // origin to resolve that against, so only an absolute URL (the CDN the mobile build points
+  // VITE_IMG_BASE at) is any use to it.
+  it('keeps an absolute http(s) url', () => {
+    expect(watchImageUrl('https://cdn.example/img/0001.jpg')).toBe('https://cdn.example/img/0001.jpg')
+    expect(watchImageUrl('http://cdn.example/img/0001.jpg')).toBe('http://cdn.example/img/0001.jpg')
+  })
+  it('drops a relative path, which the Watch cannot resolve', () => {
+    expect(watchImageUrl('img/0001.jpg')).toBeNull()
+    expect(watchImageUrl('')).toBeNull()
+    expect(watchImageUrl(undefined)).toBeNull()
   })
 })
 
@@ -73,6 +88,11 @@ describe('buildWatchPlanPayload', () => {
   it('carries a zero rest as zero, meaning the timer is off', () => {
     const payload = buildWatchPlanPayload({ ...S, restSec: 0 }, '2026-09-21')
     expect(payload.entries[0].rest).toBe(0)
+  })
+  // In a plain build the media base is relative, so there is nothing absolute to send and the
+  // field stays off the payload entirely rather than shipping a path the Watch cannot use.
+  it('omits img when the build has no absolute media base', () => {
+    expect(buildWatchPlanPayload(S, '2026-09-21').entries[0].img).toBeUndefined()
   })
   it('carries warmupRest only when the exercise asks for its own', () => {
     const plain = buildWatchPlanPayload(S, '2026-09-21')

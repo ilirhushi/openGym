@@ -539,6 +539,40 @@ private struct SetRail: View {
 }
 
 
+// The exercise photo on a list row. AsyncImage rather than a loader of our own: URLSession's
+// shared cache already keeps the bytes across launches, and a cache we wrote would be a
+// dependency too. The picture is an aid to recognition and nothing depends on it, so every
+// failure (no media base in this build, no network yet, a 404) lands on the same quiet
+// placeholder rather than an error the user has to think about.
+private struct ExerciseThumb: View {
+    let url: String?
+    private let side: CGFloat = 26
+
+    var body: some View {
+        Group {
+            if let url, let parsed = URL(string: url) {
+                AsyncImage(url: parsed) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: side, height: side)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        // The dataset's art is black line drawing on white, so at full brightness the thumbnail
+        // is the loudest thing in a row and outshouts the name, which is what you actually read.
+        // Held back a little it identifies the lift without competing for the row.
+        .opacity(0.82)
+    }
+
+    private var placeholder: some View { Color(white: 0.16) }
+}
+
 // A pushed destination needs an Identifiable, and a bare Int is not one.
 private struct ExercisePick: Identifiable, Hashable { let id: Int }
 
@@ -618,7 +652,8 @@ struct SessionListView: View {
     private func row(_ i: Int) -> some View {
         let entry = live.entries[i]
         let done = entry.sets.filter { $0.done }.count
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
+            ExerciseThumb(url: entry.img)
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.label)
                     .font(.caption)

@@ -5,10 +5,22 @@
 // (see the design doc §8), so a routine that plans one still gets a startable Watch session.
 import { effectiveRoutineIds, lastEntryFor, bestWeightForEntry } from './history.js'
 import { buildCombinedEntries, deriveSessionName } from './session-merge.js'
-import { exOr } from './exercises.js'
+import { exOr, imgSrc } from './exercises.js'
 import { restSecFor } from './supersetFlow.js'
 import { phaseForSet } from './workout-model.js'
 import { todayISO } from './format.js'
+
+/**
+ * The exercise photo's address, or null when there is nothing the Watch can fetch.
+ *
+ * The default media base is a relative "img/" served next to the web app (exercises.js), and the
+ * Watch has no origin to resolve that against. Only an absolute URL is any use to it, which in
+ * practice means the CDN the mobile build points VITE_IMG_BASE at. A build without one simply
+ * sends no image and the list shows its placeholder.
+ */
+export function watchImageUrl(src) {
+  return /^https?:\/\//i.test(src || '') ? src : null
+}
 
 export function flattenSetForWatch(set) {
   const phase = phaseForSet(set)
@@ -47,12 +59,17 @@ export function buildWatchPlanPayload(S, iso = todayISO()) {
       // than work sets, but the last ramp into the first work set rests the work rest) is the
       // Watch's to apply; this just carries the number that rule needs.
       const warmupRest = Number(entry.target?.warmupRestSec) > 0 ? Number(entry.target.warmupRestSec) : null
+      // Just the address. The bytes never travel through this channel: updateApplicationContext
+      // is a small-state pipe (a few hundred KB at most) and a day of photos would not fit, so
+      // the Watch fetches and caches them itself.
+      const img = watchImageUrl(imgSrc(exOr(entry.id)))
       return {
         id: entry.id,
         label: exOr(entry.id).n,
         target: entry.target,
         rest,
         ...(warmupRest ? { warmupRest } : {}),
+        ...(img ? { img } : {}),
         lastTime: last ? { d: last.d, w: bestWeightForEntry({ target: last.target, sets: last.sets }) || null } : null,
         sets: entry.sets.map(flattenSetForWatch),
         // Round-tripped opaque to the Watch (never read there — see WatchEntry) and read back on
