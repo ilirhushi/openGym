@@ -1,11 +1,13 @@
 import SwiftUI
 
-// Post-finish confirmation (design doc §4.4): "synced" once the OS has durably queued the
-// completed session for the phone, "will sync when phone is nearby" while that's still pending
-// or failed — never silence, so the wearer always knows the workout was actually recorded.
+// Post-finish confirmation (design doc §4.4): "saved" once the workout has been handed to
+// WCSession's own durable outbox (not yet actual delivery to the phone — the Watch has no
+// reliable way to observe that, and waiting for it would mean this screen — and the "workout
+// recorded" reassurance it gives — never resolves while the phone is out of range), "will sync
+// when the phone is nearby" while that handoff itself hasn't happened yet or failed.
 struct SummaryView: View {
     let session: WatchActiveSession
-    let synced: Bool
+    let saved: Bool
     var onDone: () -> Void
 
     var body: some View {
@@ -14,9 +16,9 @@ struct SummaryView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.green)
             Text(session.name ?? "Workout").font(.headline)
-            Text(synced ? "Synced" : "Will sync when the phone is nearby")
+            Text(saved ? "Saved" : "Will sync when the phone is nearby")
                 .font(.caption)
-                .foregroundStyle(synced ? Color.secondary : Color.orange)
+                .foregroundStyle(saved ? Color.secondary : Color.orange)
             Button("Done", action: onDone)
                 .buttonStyle(.borderedProminent)
         }

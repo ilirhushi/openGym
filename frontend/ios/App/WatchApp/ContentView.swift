@@ -7,10 +7,14 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if store.activeSession != nil {
-                    // A session is already running locally (e.g. the app relaunched mid-workout)
-                    // — go straight back into it rather than re-showing Start.
-                    Color.clear.onAppear { startedSession = store.activeSession }
+                if let active = store.activeSession, active.end == nil {
+                    // A session is genuinely still in progress (e.g. the app relaunched
+                    // mid-workout) — go straight back into it rather than re-showing Start. A
+                    // *finished* session (end != nil) that just hasn't been handed to WCSession
+                    // yet is deliberately excluded here: showing it again would trap the user
+                    // back inside a workout they already finished, on every relaunch, until
+                    // WatchConnectivitySession.resendIfNeeded() clears it in the background.
+                    Color.clear.onAppear { startedSession = active }
                 } else if let plan = store.plan {
                     planView(plan)
                 } else {

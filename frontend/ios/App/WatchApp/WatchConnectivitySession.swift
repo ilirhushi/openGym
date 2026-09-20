@@ -8,11 +8,6 @@ private let log = Logger(subsystem: "agency.prompt-digital.opengym.watchkitapp",
 final class WatchConnectivitySession: NSObject, WCSessionDelegate, ObservableObject {
     static let shared = WatchConnectivitySession()
 
-    // Set right before a transferUserInfo call, cleared once its didFinish delegate callback
-    // fires — this app only ever has one completed session in flight at a time (Finish is a
-    // single user action), so a single slot is enough, no per-transfer bookkeeping needed.
-    private var pendingCompletion: ((Bool) -> Void)?
-
     private override init() {
         super.init()
         guard WCSession.isSupported() else { return }
@@ -50,40 +45,43 @@ final class WatchConnectivitySession: NSObject, WCSessionDelegate, ObservableObj
         }
     }
 
-    // Sends a completed session back to the phone. transferUserInfo queues it with the OS and
-    // retries delivery — it does not require the phone to be reachable right now (design doc
-    // §4, the "watch-independent" requirement). `completion` reports whether the OS accepted the
-    // transfer into its durable outbox (not whether the phone has received it yet) — the caller
-    // uses that, not phone-reachability, to decide whether it's safe to discard the local copy.
+    // Sends a completed session back to the phone. transferUserInfo hands the payload to the
+    // OS's own durable, cross-launch outbox *immediately* on this call — it does not wait for
+    // the phone to actually receive it, which may not happen for hours if it's out of range
+    // (design doc §4, the "watch-independent" requirement). That handoff succeeding, not actual
+    // delivery, is what `completion` reports and what the caller uses to decide it's safe to
+    // discard the local copy: waiting for WCSessionDelegate's `didFinish` (which only fires on
+    // real delivery or a permanent failure) would mean a phone that's merely unreachable right
+    // now never clears the finished session at all — trapping the Watch on it indefinitely.
     func sendCompletedSession(_ session: WatchActiveSession, completion: @escaping (Bool) -> Void) {
         guard let data = try? JSONEncoder().encode(session),
               let payloadString = String(data: data, encoding: .utf8) else {
             completion(false)
             return
         }
-        guard WCSession.isSupported() else {
+        // transferUserInfo raises an uncatchable ObjC exception if called before activation
+        // completes — this guard is the only thing standing between a not-yet-activated session
+        // and a crash on Finish.
+        guard WCSession.isSupported(), WCSession.default.activationState == .activated else {
             completion(false)
             return
         }
-        pendingCompletion = completion
-        WCSession.default.transferUserInfo(["payload": payloadString])
+        _ = WCSession.default.transferUserInfo(["payload": payloadString])
+        completion(true)
     }
 
+    // Diagnostic only (design doc §6 — no Swift test harness, so a log line is the only
+    // visibility this ever gets): whether a queued transfer was eventually delivered. Never used
+    // to decide whether the local copy is safe to discard — see sendCompletedSession above.
     func session(_ session: WCSession, didFinish userInfoTransfer: WCSessionUserInfoTransfer, error: Error?) {
-        let ok = error == nil
         if let error = error {
-            log.error("transferUserInfo failed: \(error.localizedDescription, privacy: .public)")
-        }
-        DispatchQueue.main.async { [weak self] in
-            self?.pendingCompletion?(ok)
-            self?.pendingCompletion = nil
+            log.error("a queued Watch session transfer failed permanently: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    // A session that finished but never got a successful transferUserInfo handoff (app was
-    // killed before didFinish fired, or the earlier attempt errored) stays persisted rather than
-    // discarded (SessionView.finish()) — retry it whenever the session (re)activates, which
-    // covers both "the Watch app relaunched" and "connectivity just came back".
+    // A session that finished but never got handed to WCSession (the app launched before
+    // activation completed, or a prior attempt's encode failed) stays persisted rather than
+    // discarded (SessionView.finish()) — retry the handoff whenever the session (re)activates.
     func resendIfNeeded() {
         guard let session = WatchSessionStore.shared.activeSession, session.end != nil else { return }
         sendCompletedSession(session) { success in

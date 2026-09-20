@@ -6,7 +6,7 @@ struct SessionView: View {
     @State private var exerciseIndex = 0
     @State private var showRest = false
     @State private var summary: WatchActiveSession?
-    @State private var summarySynced = false
+    @State private var summarySaved = false
 
     var body: some View {
         TabView(selection: $exerciseIndex) {
@@ -17,7 +17,7 @@ struct SessionView: View {
         .tabViewStyle(.page)
         .sheet(isPresented: $showRest) { RestTimerView(seconds: 90) { showRest = false } }
         .fullScreenCover(item: $summary) { finished in
-            SummaryView(session: finished, synced: summarySynced) {
+            SummaryView(session: finished, saved: summarySaved) {
                 summary = nil
                 onFinished()
             }
@@ -87,14 +87,15 @@ struct SessionView: View {
     private func finish() {
         WatchSessionStore.shared.activeSession = session
         guard let finished = WatchSessionStore.shared.finishSession() else { return }
-        // Show the summary immediately (optimistic — the transfer is already durably queued
-        // with the OS once sendCompletedSession's completion fires); only clear the local copy
-        // once that's confirmed, so a failure leaves the session persisted for retry
-        // (WatchConnectivitySession.resendIfNeeded) instead of losing it.
         summary = finished
-        summarySynced = false
+        summarySaved = false
+        // sendCompletedSession's completion reports whether the workout was handed to
+        // WCSession's durable outbox (not actual delivery to the phone — see that function's
+        // comment). Only clear the local copy once that handoff succeeds, so a failure (not yet
+        // activated, encode error) leaves the session persisted for
+        // WatchConnectivitySession.resendIfNeeded to retry instead of losing it.
         WatchConnectivitySession.shared.sendCompletedSession(finished) { success in
-            summarySynced = success
+            summarySaved = success
             if success { WatchSessionStore.shared.clearFinishedSession() }
         }
     }

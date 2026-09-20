@@ -1,27 +1,25 @@
 import SwiftUI
 import WatchKit
 
-// A plain Timer only runs while the app is frontmost, and watchOS suspends the app within
-// seconds of the wrist dropping — the normal posture during a rest interval — so the haptic
-// would silently never fire. WKExtendedRuntimeSession's base (non-entitled) mode buys roughly an
-// extra minute of background runtime, which is what lets the countdown and haptic survive that.
-// A rest longer than that still needs the wrist raised near the end — a known phase-1 limit, not
-// solvable without requesting a background-mode entitlement this sideloaded (non-App-Store) app
-// doesn't otherwise need.
+// The countdown itself is a plain Timer, started immediately and unconditionally — it must never
+// depend on WKExtendedRuntimeSession succeeding, or a denied/invalidated session would mean the
+// rest timer silently never runs at all (worse than not extending background time). The extended
+// runtime session is layered on purely as a best-effort way to keep the app (and so the timer)
+// alive a little longer once the wrist drops — watchOS suspends a foregrounded-only app within
+// seconds of that, the normal posture during a rest interval — never as something the countdown
+// waits on or is torn down by if it invalidates first.
 final class RestTimerRunner: NSObject, ObservableObject, WKExtendedRuntimeSessionDelegate {
     @Published var remaining: Int
-    private let total: Int
     private var session: WKExtendedRuntimeSession?
     private var timer: Timer?
     var onDone: (() -> Void)?
 
     init(seconds: Int) {
-        self.total = max(1, seconds)
-        self.remaining = self.total
+        remaining = max(1, seconds)
     }
 
     func start() {
-        guard session == nil else { return }
+        beginCountdown()
         let s = WKExtendedRuntimeSession()
         s.delegate = self
         s.start()
@@ -30,12 +28,24 @@ final class RestTimerRunner: NSObject, ObservableObject, WKExtendedRuntimeSessio
 
     func skip() { finish() }
 
-    func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
-        DispatchQueue.main.async { [weak self] in self?.beginCountdown() }
+    // Called when the view disappears without the countdown reaching zero (a sheet swipe-dismiss
+    // — watchOS sheets are dismissable that way). Tears down the timer and the runtime session
+    // without firing the haptic or onDone, which finish() would do.
+    func cancel() {
+        timer?.invalidate()
+        timer = nil
+        session?.invalidate()
+        session = nil
     }
 
+    func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
+
     func extendedRuntimeSession(_ extendedRuntimeSession: WKExtendedRuntimeSession, didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason, error: Error?) {
-        DispatchQueue.main.async { [weak self] in self?.timer?.invalidate() }
+        // Only drop the reference — the countdown Timer is independent and keeps running
+        // (foregrounded) or gets suspended by the OS along with the rest of the app either way;
+        // it must not be invalidated here, or the rest of the intended runtime this session
+        // bought would go to waste.
+        DispatchQueue.main.async { [weak self] in self?.session = nil }
     }
 
     func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
@@ -53,7 +63,7 @@ final class RestTimerRunner: NSObject, ObservableObject, WKExtendedRuntimeSessio
     }
 
     private func finish() {
-        guard timer != nil || session != nil else { return }
+        guard timer != nil else { return }
         timer?.invalidate()
         timer = nil
         WKInterfaceDevice.current().play(.success)
@@ -81,5 +91,6 @@ struct RestTimerView: View {
             runner.onDone = onDone
             runner.start()
         }
+        .onDisappear { runner.cancel() }
     }
 }
