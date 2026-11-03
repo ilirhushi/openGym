@@ -1,0 +1,5 @@
+services:
+  api:
+    image: ghcr.io/ilirhushi/opengym-api:${DEPLOY_TAG:?Set DEPLOY_TAG to the commit being deployed}
+  web:
+    image: ghcr.io/ilirhushi/opengym-web:${DEPLOY_TAG:?Set DEPLOY_TAG to the commit being deployed}
